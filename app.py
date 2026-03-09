@@ -50,16 +50,11 @@ def parse_currency(series):
         s = str(val).replace('R$', '').strip()
         if not s: return 0.0
         
-        # Lógica para formato brasileiro: 1.234,56 -> 1234.56
-        # Se houver vírgula, assume que é o decimal
         if ',' in s:
             s = s.replace('.', '').replace(',', '.')
-        # Se não houver vírgula mas houver ponto, precisamos checar se é milhar ou decimal
-        # Em planilhas brasileiras, se houver apenas um ponto e 2 casas depois, pode ser decimal.
-        # Mas o padrão exportado costuma ser milhar. Vamos tratar como milhar se houver 3 casas após.
         elif '.' in s:
             parts = s.split('.')
-            if len(parts[-1]) != 2: # Se não forem 2 casas decimais, assume que o ponto era milhar
+            if len(parts[-1]) != 2:
                 s = s.replace('.', '')
         
         try:
@@ -70,43 +65,44 @@ def parse_currency(series):
     return series.apply(clean_val)
 
 def processar_dados():
-    df_vendas = load_data(VENDAS_ID, gid=VENDAS_GID)
-    df_cancelados = load_data(CANCELADOS_ID, gid=CANCELADOS_GID)
+    df_vendas_raw = load_data(VENDAS_ID, gid=VENDAS_GID)
+    df_cancelados_raw = load_data(CANCELADOS_ID, gid=CANCELADOS_GID)
     
-    if df_vendas.empty:
+    if df_vendas_raw.empty:
         return None
 
     # Mapeamento de Colunas
     map_cols = {
-        'vendedor': encontrar_coluna(df_vendas, 'vendedor'),
-        'sdr': encontrar_coluna(df_vendas, 'sdr'),
-        'cliente': encontrar_coluna(df_vendas, 'cliente'),
-        'cnpj': encontrar_coluna(df_vendas, 'cnpj'),
-        'produto': encontrar_coluna(df_vendas, 'Qual produto?'), # Coluna M
-        'data_ativacao': encontrar_coluna(df_vendas, 'Data de Ativação'), # Coluna H
-        'mrr': encontrar_coluna(df_vendas, 'Mensalidade - Simples'),
-        'adesao_s': encontrar_coluna(df_vendas, 'Adesão - Simples'),
-        'adesao_r': encontrar_coluna(df_vendas, 'Adesão - Recupera'),
-        'upgrade': encontrar_coluna(df_vendas, 'Aumento da mensalidade'),
-        'downgrade': encontrar_coluna(df_vendas, 'Redução da mensalidade')
+        'vendedor': encontrar_coluna(df_vendas_raw, 'vendedor'),
+        'sdr': encontrar_coluna(df_vendas_raw, 'sdr'),
+        'cliente': encontrar_coluna(df_vendas_raw, 'cliente'),
+        'cnpj': encontrar_coluna(df_vendas_raw, 'cnpj'),
+        'produto': encontrar_coluna(df_vendas_raw, 'Qual produto?'),
+        'data_ativacao': encontrar_coluna(df_vendas_raw, 'Data de Ativação'),
+        'mrr': encontrar_coluna(df_vendas_raw, 'Mensalidade - Simples'),
+        'adesao_s': encontrar_coluna(df_vendas_raw, 'Adesão - Simples'),
+        'adesao_r': encontrar_coluna(df_vendas_raw, 'Adesão - Recupera'),
+        'upgrade': encontrar_coluna(df_vendas_raw, 'Aumento da mensalidade'),
+        'downgrade': encontrar_coluna(df_vendas_raw, 'Redução da mensalidade')
     }
 
-    # Construção do DataFrame
+    # Construção do DataFrame Principal
     df = pd.DataFrame()
-    df['vendedor'] = df_vendas[map_cols['vendedor']] if map_cols['vendedor'] else "N/A"
-    df['sdr'] = df_vendas[map_cols['sdr']] if map_cols['sdr'] else "N/A"
-    df['cliente'] = df_vendas[map_cols['cliente']] if map_cols['cliente'] else "N/A"
+    df['vendedor'] = df_vendas_raw[map_cols['vendedor']] if map_cols['vendedor'] else "N/A"
+    df['sdr'] = df_vendas_raw[map_cols['sdr']] if map_cols['sdr'] else "N/A"
+    df['cliente'] = df_vendas_raw[map_cols['cliente']] if map_cols['cliente'] else "N/A"
+    df['cnpj'] = df_vendas_raw[map_cols['cnpj']] if map_cols['cnpj'] else "N/A"
     
-    # Lógica de Produto (Coluna M)
+    # Lógica de Produto
     if map_cols['produto']:
-        df['produto'] = df_vendas[map_cols['produto']].fillna("Sittax Simples")
+        df['produto'] = df_vendas_raw[map_cols['produto']].fillna("Sittax Simples")
         df.loc[df['produto'].astype(str).str.strip() == "", 'produto'] = "Sittax Simples"
     else:
         df['produto'] = "Sittax Simples"
     
-    # Datas (Coluna H)
+    # Datas
     if map_cols['data_ativacao']:
-        df['data'] = pd.to_datetime(df_vendas[map_cols['data_ativacao']], errors='coerce', dayfirst=True)
+        df['data'] = pd.to_datetime(df_vendas_raw[map_cols['data_ativacao']], errors='coerce', dayfirst=True)
         df['ano'] = df['data'].dt.year.fillna(0).astype(int)
         df['mes_num'] = df['data'].dt.month.fillna(0).astype(int)
         meses_pt = {1: 'Janeiro', 2: 'Fevereiro', 3: 'Março', 4: 'Abril', 5: 'Maio', 6: 'Junho',
@@ -117,20 +113,20 @@ def processar_dados():
         df['ano'] = 0
         df['mes_nome'] = "Sem Data"
 
-    # Financeiro com novo parse_currency
-    df['mrr'] = parse_currency(df_vendas[map_cols['mrr']]) if map_cols['mrr'] else 0.0
-    df['adesao'] = parse_currency(df_vendas[map_cols['adesao_s']]) + parse_currency(df_vendas[map_cols['adesao_r']])
-    df['upgrade'] = parse_currency(df_vendas[map_cols['upgrade']]) if map_cols['upgrade'] else 0.0
-    df['downgrade'] = parse_currency(df_vendas[map_cols['downgrade']]) if map_cols['downgrade'] else 0.0
+    # Financeiro
+    df['mrr'] = parse_currency(df_vendas_raw[map_cols['mrr']]) if map_cols['mrr'] else 0.0
+    df['adesao'] = parse_currency(df_vendas_raw[map_cols['adesao_s']]) + parse_currency(df_vendas_raw[map_cols['adesao_r']])
+    df['upgrade'] = parse_currency(df_vendas_raw[map_cols['upgrade']]) if map_cols['upgrade'] else 0.0
+    df['downgrade'] = parse_currency(df_vendas_raw[map_cols['downgrade']]) if map_cols['downgrade'] else 0.0
     df['receita_total'] = df['mrr'] + df['adesao']
 
-    # Cancelados
+    # Cruzamento de Cancelados (Status)
     df['status'] = 'Confirmada'
-    if map_cols['cnpj'] and not df_cancelados.empty:
-        vendas_cnpj = df_vendas[map_cols['cnpj']].astype(str).str.replace(r'\D', '', regex=True)
-        col_cnpj_canc = encontrar_coluna(df_cancelados, 'cnpj')
+    if map_cols['cnpj'] and not df_cancelados_raw.empty:
+        vendas_cnpj = df_vendas_raw[map_cols['cnpj']].astype(str).str.replace(r'\D', '', regex=True)
+        col_cnpj_canc = encontrar_coluna(df_cancelados_raw, 'cnpj')
         if col_cnpj_canc:
-            canc_cnpjs = df_cancelados[col_cnpj_canc].astype(str).str.replace(r'\D', '', regex=True).unique()
+            canc_cnpjs = df_cancelados_raw[col_cnpj_canc].astype(str).str.replace(r'\D', '', regex=True).unique()
             df.loc[vendas_cnpj.isin(canc_cnpjs), 'status'] = 'Cancelada'
     
     # Auditoria: Remover linhas sem cliente ou vendedor
@@ -164,6 +160,7 @@ if df is not None and not df.empty:
     sdrs = ["Todos"] + sorted(df['sdr'].unique().tolist())
     sdr_sel = st.sidebar.selectbox("SDR", sdrs)
     
+    # Aplicação de Filtros
     df_f = df[df['ano'] == ano_sel].copy()
     if meses_sel:
         df_f = df_f[df_f['mes_nome'].isin(meses_sel)]
@@ -174,35 +171,60 @@ if df is not None and not df.empty:
     if sdr_sel != "Todos":
         df_f = df_f[df_f['sdr'] == sdr_sel]
     
-    c1, c2, c3, c4 = st.columns(4)
+    # --- CÁLCULOS DE KPIs ---
+    # 1. MRR Ativo (MRR Conquistado - MRR Cancelado no período)
+    mrr_conquistado = df_f[df_f['status'] == 'Confirmada']['mrr'].sum()
+    mrr_cancelado = df_f[df_f['status'] == 'Cancelada']['mrr'].sum()
+    mrr_ativo = mrr_conquistado - mrr_cancelado
     
-    mrr_total = df_f['mrr'].sum()
-    adesao_total = df_f['adesao'].sum()
-    saldo_up_down = df_f['upgrade'].sum() - df_f['downgrade'].sum()
-    taxa_cancelamento = (len(df_f[df_f['status'] == 'Cancelada']) / len(df_f) * 100) if len(df_f) > 0 else 0
+    # 2. Clientes Fechados e Cancelados
+    clientes_fechados = len(df_f[df_f['status'] == 'Confirmada'])
+    clientes_cancelados = len(df_f[df_f['status'] == 'Cancelada'])
     
-    c1.metric("MRR Total", f"R$ {mrr_total:,.2f}")
-    c2.metric("Adesão Total", f"R$ {adesao_total:,.2f}")
-    c3.metric("Saldo Up/Down", f"R$ {saldo_up_down:,.2f}", delta=saldo_up_down)
-    c4.metric("Churn Rate", f"{taxa_cancelamento:.1f}%", delta_color="inverse")
+    # 3. Ticket Médio (MRR Conquistado / Clientes Ativados)
+    ticket_medio = mrr_conquistado / clientes_fechados if clientes_fechados > 0 else 0
+    
+    # 4. Total de Clientes Ativos (Base Histórica - Independente de Filtro)
+    total_ativacoes_hist = len(df[df['status'] == 'Confirmada'])
+    total_cancelamentos_hist = len(df[df['status'] == 'Cancelada'])
+    base_ativa_total = total_ativacoes_hist - total_cancelamentos_hist
+
+    # --- EXIBIÇÃO DE CARDS ---
+    c1, c2, c3 = st.columns(3)
+    c1.metric("MRR Ativo (Net New)", f"R$ {mrr_ativo:,.2f}")
+    c2.metric("Ticket Médio", f"R$ {ticket_medio:,.2f}")
+    c3.metric("Total Clientes Ativos (Base)", base_ativa_total)
+    
+    st.write("") # Espaçamento
+    
+    c4, c5, c6 = st.columns(3)
+    c4.metric("Clientes Fechados", clientes_fechados)
+    c5.metric("Clientes Cancelados", clientes_cancelados)
+    c6.metric("Adesão Total", f"R$ {df_f['adesao'].sum():,.2f}")
 
     st.divider()
     
+    # --- VISUALIZAÇÕES ---
     col_esq, col_dir = st.columns(2)
+    
     with col_esq:
+        # Gráfico de Evolução Mensal de MRR (Sugestão Sênior)
+        df_evolucao = df_ano.groupby(['mes_num', 'mes_nome'])['mrr'].sum().reset_index()
+        df_evolucao = df_evolucao.sort_values('mes_num')
+        fig_evolucao = px.bar(df_evolucao, x='mes_nome', y='mrr', 
+                             title=f"Evolução Mensal de MRR - {ano_sel}",
+                             labels={'mes_nome': 'Mês', 'mrr': 'MRR Conquistado (R$)'},
+                             color_discrete_sequence=['#3498DB'])
+        st.plotly_chart(fig_evolucao, use_container_width=True)
+        
+    with col_dir:
+        # Receita por Produto
         fig_produto = px.pie(df_f, names='produto', values='receita_total', 
-                          title="Receita Total por Produto", hole=0.4,
+                          title="Distribuição de Receita por Produto", hole=0.4,
                           color_discrete_sequence=px.colors.qualitative.Pastel)
         st.plotly_chart(fig_produto, use_container_width=True)
-    with col_dir:
-        status_counts = df_f['status'].value_counts().reset_index()
-        status_counts.columns = ['status', 'quantidade']
-        fig_status = px.bar(status_counts, x='status', y='quantidade', 
-                           title="Volume de Vendas por Status",
-                           color='status',
-                           color_discrete_map={'Confirmada': '#2ECC71', 'Cancelada': '#E74C3C'})
-        st.plotly_chart(fig_status, use_container_width=True)
 
+    # Tabela de Detalhamento
     st.subheader("📋 Detalhamento das Operações")
     cols_view = ['data', 'cliente', 'vendedor', 'sdr', 'produto', 'status', 'mrr', 'adesao']
     st.dataframe(df_f[cols_view].sort_values('data', ascending=False), use_container_width=True)
