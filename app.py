@@ -66,7 +66,7 @@ def processar_dados():
         'mrr': encontrar_coluna(df_vendas_raw, 'Mensalidade - Simples'),
         'adesao_s': encontrar_coluna(df_vendas_raw, 'Adesão - Simples'),
         'adesao_r': encontrar_coluna(df_vendas_raw, 'Adesão - Recupera'),
-        'upgrade': encontrar_coluna(df_vendas_raw, 'Aumento da mensalidade'),
+        'upgrade': encontrar_coluna(df_vendas_raw, 'Aumento da mensalidade'), # Coluna T
         'downgrade': encontrar_coluna(df_vendas_raw, 'Redução da mensalidade')
     }
 
@@ -98,7 +98,7 @@ def processar_dados():
     df['adesao'] = parse_currency(df_vendas_raw[map_cols['adesao_s']]) + parse_currency(df_vendas_raw[map_cols['adesao_r']])
     df['upgrade'] = parse_currency(df_vendas_raw[map_cols['upgrade']]) if map_cols['upgrade'] else 0.0
     df['downgrade'] = parse_currency(df_vendas_raw[map_cols['downgrade']]) if map_cols['downgrade'] else 0.0
-    df['receita_total'] = df['mrr'] + df['adesao']
+    df['receita_total'] = df['mrr'] + df['adesao'] + df['upgrade']
 
     df['status'] = 'Confirmada'
     if map_cols['cnpj'] and not df_cancelados_raw.empty:
@@ -108,7 +108,9 @@ def processar_dados():
             canc_cnpjs = df_cancelados_raw[col_cnpj_canc].astype(str).str.replace(r'\D', '', regex=True).unique()
             df.loc[vendas_cnpj.isin(canc_cnpjs), 'status'] = 'Cancelada'
     
-    df = df[~((df['cliente'] == "N/A") | (df['vendedor'] == "N/A") | (df['cliente'].isna()))]
+    # Auditoria: Remover apenas linhas totalmente vazias (sem cliente e sem valores financeiros)
+    df = df[~((df['cliente'].isna() | (df['cliente'] == "N/A")) & (df['mrr'] == 0) & (df['upgrade'] == 0))]
+    
     return df
 
 # --- UI ---
@@ -148,15 +150,18 @@ if df is not None and not df.empty:
     mrr_cancelado = df_f[df_f['status'] == 'Cancelada']['mrr'].sum()
     mrr_ativo = mrr_conquistado - mrr_cancelado
     upsell_total = df_f['upgrade'].sum()
-    clientes_fechados = len(df_f[df_f['status'] == 'Confirmada'])
+    
+    clientes_fechados = len(df_f[(df_f['status'] == 'Confirmada') & (df_f['mrr'] > 0)])
     clientes_cancelados = len(df_f[df_f['status'] == 'Cancelada'])
+    
     ticket_medio = mrr_conquistado / clientes_fechados if clientes_fechados > 0 else 0
-    total_ativacoes_hist = len(df[df['status'] == 'Confirmada'])
+    
+    total_ativacoes_hist = len(df[(df['status'] == 'Confirmada') & (df['mrr'] > 0)])
     total_cancelamentos_hist = len(df[df['status'] == 'Cancelada'])
     base_ativa_total = total_ativacoes_hist - total_cancelamentos_hist
     perc_churn = (mrr_cancelado / mrr_conquistado * 100) if mrr_conquistado > 0 else 0
 
-    # --- EXIBIÇÃO DE CARDS (9 CARDS) ---
+    # --- EXIBIÇÃO DE CARDS ---
     c1, c2, c3 = st.columns(3)
     c1.metric("MRR Conquistado", f"R$ {mrr_conquistado:,.2f}")
     c2.metric("MRR Ativo (Net New)", f"R$ {mrr_ativo:,.2f}")
@@ -266,7 +271,7 @@ if df is not None and not df.empty:
 
     # Tabela de Detalhamento
     st.subheader("📋 Detalhamento das Operações")
-    cols_view = ['data', 'cliente', 'vendedor', 'sdr', 'produto', 'status', 'mrr', 'adesao']
+    cols_view = ['data', 'cliente', 'vendedor', 'sdr', 'produto', 'status', 'mrr', 'upgrade', 'adesao']
     st.dataframe(df_f[cols_view].sort_values('data', ascending=False), use_container_width=True)
 
 else:
