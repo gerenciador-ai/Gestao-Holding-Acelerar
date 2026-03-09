@@ -88,7 +88,6 @@ def processar_dados():
         meses_pt = {1: 'Janeiro', 2: 'Fevereiro', 3: 'Março', 4: 'Abril', 5: 'Maio', 6: 'Junho',
                     7: 'Julho', 8: 'Agosto', 9: 'Setembro', 10: 'Outubro', 11: 'Novembro', 12: 'Dezembro'}
         df['mes_nome'] = df['mes_num'].map(meses_pt).fillna("Sem Data")
-        # Lógica de Início da Semana (Segunda-feira)
         df['inicio_semana'] = df['data'].apply(lambda x: x - pd.Timedelta(days=x.weekday()) if pd.notnull(x) else pd.NaT)
     else:
         df['data'] = pd.NaT
@@ -148,6 +147,7 @@ if df is not None and not df.empty:
     mrr_conquistado = df_f[df_f['status'] == 'Confirmada']['mrr'].sum()
     mrr_cancelado = df_f[df_f['status'] == 'Cancelada']['mrr'].sum()
     mrr_ativo = mrr_conquistado - mrr_cancelado
+    upsell_total = df_f['upgrade'].sum()
     clientes_fechados = len(df_f[df_f['status'] == 'Confirmada'])
     clientes_cancelados = len(df_f[df_f['status'] == 'Cancelada'])
     ticket_medio = mrr_conquistado / clientes_fechados if clientes_fechados > 0 else 0
@@ -156,28 +156,31 @@ if df is not None and not df.empty:
     base_ativa_total = total_ativacoes_hist - total_cancelamentos_hist
     perc_churn = (mrr_cancelado / mrr_conquistado * 100) if mrr_conquistado > 0 else 0
 
-    # --- EXIBIÇÃO DE CARDS ---
-    c1, c2, c3, c4 = st.columns(4)
+    # --- EXIBIÇÃO DE CARDS (9 CARDS) ---
+    c1, c2, c3 = st.columns(3)
     c1.metric("MRR Conquistado", f"R$ {mrr_conquistado:,.2f}")
     c2.metric("MRR Ativo (Net New)", f"R$ {mrr_ativo:,.2f}")
     c3.metric("MRR Perdido (Churn)", f"R$ {mrr_cancelado:,.2f}", delta=f"{perc_churn:.1f}% do Conquistado", delta_color="inverse")
-    c4.metric("Ticket Médio", f"R$ {ticket_medio:,.2f}")
     
     st.write("")
+    c4, c5, c6 = st.columns(3)
+    c4.metric("Total de Upsell (no periodo)", f"R$ {upsell_total:,.2f}")
+    c5.metric("Ticket Médio", f"R$ {ticket_medio:,.2f}")
+    c6.metric("Adesão total (no periodo)", f"R$ {df_f['adesao'].sum():,.2f}")
     
-    c5, c6, c7, c8 = st.columns(4)
-    c5.metric("Clientes fechado (no periodo)", clientes_fechados)
-    c6.metric("Clientes Cancelados (no periodo)", clientes_cancelados)
-    c7.metric("Adesão total (no periodo)", f"R$ {df_f['adesao'].sum():,.2f}")
-    c8.metric("Total Clientes Ativos (Base)", base_ativa_total)
+    st.write("")
+    c7, c8, c9 = st.columns(3)
+    c7.metric("Clientes fechado (no periodo)", clientes_fechados)
+    c8.metric("Clientes Cancelados (no periodo)", clientes_cancelados)
+    c9.metric("Total Clientes Ativos (Base)", base_ativa_total)
 
     st.divider()
     
     # --- VISUALIZAÇÕES: EVOLUÇÃO MENSAL ---
     st.subheader("📈 Evolução Mensal")
-    col_esq, col_dir = st.columns(2)
+    col_mrr, col_upsell, col_churn = st.columns(3)
     
-    with col_esq:
+    with col_mrr:
         df_evol = df_ano[df_ano['status'] == 'Confirmada'].groupby(['mes_num', 'mes_nome']).agg(
             mrr=('mrr', 'sum'), contratos=('cliente', 'count')
         ).reset_index().sort_values('mes_num')
@@ -186,8 +189,19 @@ if df is not None and not df.empty:
                          labels={'mes_nome': 'Mês', 'mrr': 'MRR (R$)'}, color_discrete_sequence=['#2ECC71'])
         fig_evol.update_traces(texttemplate='%{text}', textposition='inside')
         st.plotly_chart(fig_evol, use_container_width=True)
+
+    with col_upsell:
+        df_up_evol = df_ano.groupby(['mes_num', 'mes_nome']).agg(
+            upgrade=('upgrade', 'sum'), contratos=('cliente', 'count')
+        ).reset_index().sort_values('mes_num')
+        df_up_evol = df_up_evol[df_up_evol['upgrade'] > 0]
+        fig_up_evol = px.bar(df_up_evol, x='mes_nome', y='upgrade', text='contratos',
+                            title=f"Evolução Mensal de Upsell - {ano_sel}",
+                            labels={'mes_nome': 'Mês', 'upgrade': 'Upsell (R$)'}, color_discrete_sequence=['#9B59B6'])
+        fig_up_evol.update_traces(texttemplate='%{text}', textposition='inside')
+        st.plotly_chart(fig_up_evol, use_container_width=True)
         
-    with col_dir:
+    with col_churn:
         df_churn_hist = df_ano[df_ano['status'] == 'Cancelada'].groupby(['mes_num', 'mes_nome']).agg(
             mrr=('mrr', 'sum'), contratos=('cliente', 'count')
         ).reset_index().sort_values('mes_num')
@@ -228,32 +242,20 @@ if df is not None and not df.empty:
 
     st.divider()
 
-    # --- VISUALIZAÇÕES: ANÁLISE TEMPORAL DETALHADA ---
-    st.subheader("📅 Análise Temporal Detalhada")
+    # --- VISUALIZAÇÕES: ANÁLISE TEMPORAL E PRODUTO ---
+    st.subheader("📅 Análise Temporal e Distribuição")
     col_semana, col_pizza = st.columns(2)
 
     with col_semana:
-        # NOVO: MRR SEMANA (Gráfico de Linha com Marcadores)
         df_semana = df_f[df_f['status'] == 'Confirmada'].groupby('inicio_semana')['mrr'].sum().reset_index().sort_values('inicio_semana')
         df_semana['data_str'] = df_semana['inicio_semana'].dt.strftime('%d/%m/%Y')
-        
         fig_semana = go.Figure()
         fig_semana.add_trace(go.Scatter(
-            x=df_semana['data_str'], 
-            y=df_semana['mrr'],
-            mode='lines+markers+text',
-            name='MRR Semana',
-            text=df_semana['mrr'].apply(lambda x: f"{x:,.0f}"),
-            textposition="top center",
-            line=dict(color='#1A3A5A', width=4),
-            marker=dict(size=10, color='#1A3A5A')
+            x=df_semana['data_str'], y=df_semana['mrr'], mode='lines+markers+text',
+            text=df_semana['mrr'].apply(lambda x: f"{x:,.0f}"), textposition="top center",
+            line=dict(color='#1A3A5A', width=4), marker=dict(size=10, color='#1A3A5A')
         ))
-        fig_semana.update_layout(
-            title="MRR SEMANA",
-            xaxis_title="Início da Semana",
-            yaxis_title="MRR (R$)",
-            showlegend=False
-        )
+        fig_semana.update_layout(title="MRR SEMANA", xaxis_title="Início da Semana", yaxis_title="MRR (R$)", showlegend=False)
         st.plotly_chart(fig_semana, use_container_width=True)
 
     with col_pizza:
