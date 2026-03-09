@@ -44,7 +44,6 @@ def processar_dados():
     df_c = load_data(CANCELADOS_ID, CANCELADOS_GID)
     if df_v.empty: return None
 
-    # Mapeamento Direto de Colunas
     df = pd.DataFrame()
     df['vendedor'] = df_v['Vendedor'].fillna("N/A")
     df['sdr'] = df_v['SDR'].fillna("N/A")
@@ -53,21 +52,19 @@ def processar_dados():
     df['produto'] = df_v['Qual produto?'].fillna("Sittax Simples")
     df.loc[df['produto'].astype(str).str.strip() == "", 'produto'] = "Sittax Simples"
 
-    # Valores Financeiros
     df['mrr'] = parse_currency(df_v['Mensalidade - Simples'])
     df['adesao'] = parse_currency(df_v['Adesão - Simples']) + parse_currency(df_v['Adesão - Recupera'])
-    df['upgrade'] = parse_currency(df_v['Aumento da mensalidade']) # Coluna T
+    df['upgrade'] = parse_currency(df_v['Aumento da mensalidade'])
     df['downgrade'] = parse_currency(df_v['Redução da mensalidade'])
 
-    # Lógica de Datas (H para Vendas, X para Upsell)
-    df['data_h'] = pd.to_datetime(df_v['Data de Ativação'], errors='coerce', dayfirst=True)
-    df['data_x'] = pd.to_datetime(df_v['Data alteração de CNPJ'], errors='coerce', dayfirst=True)
+    # Padronização para Formato Americano (Mês/Dia/Ano) conforme orientação
+    df['data_h'] = pd.to_datetime(df_v['Data de Ativação'], errors='coerce', dayfirst=False)
+    df['data_x'] = pd.to_datetime(df_v['Data alteração de CNPJ'], errors='coerce', dayfirst=False)
     
-    # Data oficial: Se tem upgrade, usa X. Se não, usa H.
     df['data'] = df['data_h']
     df.loc[df['upgrade'] > 0, 'data'] = df['data_x']
     
-    df = df.dropna(subset=['data']) # Remove apenas se não tiver nenhuma das duas datas
+    df = df.dropna(subset=['data'])
     df['ano'] = df['data'].dt.year.astype(int)
     df['mes_num'] = df['data'].dt.month.astype(int)
     meses_pt = {1:'Janeiro', 2:'Fevereiro', 3:'Março', 4:'Abril', 5:'Maio', 6:'Junho',
@@ -75,7 +72,6 @@ def processar_dados():
     df['mes_nome'] = df['mes_num'].map(meses_pt)
     df['inicio_semana'] = df['data'].apply(lambda x: x - pd.Timedelta(days=x.weekday()))
 
-    # Status de Cancelamento
     df['status'] = 'Confirmada'
     if not df_c.empty:
         canc_cnpjs = df_c['CNPJ do Cliente'].astype(str).str.replace(r'\D', '', regex=True).unique()
@@ -88,7 +84,6 @@ df = processar_dados()
 if df is not None:
     st.title("📊 Dashboard Comercial Estratégico")
     
-    # Sidebar
     st.sidebar.header("🔍 Filtros")
     anos = sorted(df['ano'].unique(), reverse=True)
     ano_sel = st.sidebar.selectbox("Ano", anos)
@@ -102,7 +97,6 @@ if df is not None:
     vend_sel = st.sidebar.selectbox("Vendedor", ["Todos"] + sorted(df['vendedor'].unique().tolist()))
     sdr_sel = st.sidebar.selectbox("SDR", ["Todos"] + sorted(df['sdr'].unique().tolist()))
 
-    # Filtros Aplicados
     df_f = df_ano[df_ano['mes_nome'].isin(meses_sel)].copy()
     if prod_sel != "Todos": df_f = df_f[df_f['produto'] == prod_sel]
     if vend_sel != "Todos": df_f = df_f[df_f['vendedor'] == vend_sel]
@@ -119,7 +113,6 @@ if df is not None:
     base_ativa = len(df[df['status'] == 'Confirmada']) - len(df[df['status'] == 'Cancelada'])
     churn_p = (mrr_perd / mrr_conq * 100) if mrr_conq > 0 else 0
 
-    # Cards
     c1, c2, c3 = st.columns(3)
     c1.metric("MRR Conquistado", f"R$ {mrr_conq:,.2f}")
     c2.metric("MRR Ativo (Net)", f"R$ {mrr_conq - mrr_perd:,.2f}")
@@ -137,25 +130,33 @@ if df is not None:
 
     st.divider()
     
-    # Gráficos de Evolução
     st.subheader("📈 Evolução Mensal")
     col1, col2, col3 = st.columns(3)
     
     with col1:
-        df_m = df_ano[df_ano['status'] == 'Confirmada'].groupby(['mes_num','mes_nome'])['mrr'].sum().reset_index().sort_values('mes_num')
-        st.plotly_chart(px.bar(df_m, x='mes_nome', y='mrr', title="MRR Conquistado", color_discrete_sequence=['#2ECC71']), use_container_width=True)
+        df_m = df_ano[df_ano['status'] == 'Confirmada'].groupby(['mes_num','mes_nome']).agg({'mrr':'sum', 'cliente':'count'}).reset_index().sort_values('mes_num')
+        fig = px.bar(df_m, x='mes_nome', y='mrr', text='cliente', title="MRR Conquistado", color_discrete_sequence=['#2ECC71'])
+        fig.update_traces(texttemplate='%{text}', textposition='inside')
+        fig.update_layout(xaxis_title=None, yaxis_title=None)
+        st.plotly_chart(fig, use_container_width=True)
     
     with col2:
-        df_u = df_ano[df_ano['upgrade'] > 0].groupby(['mes_num','mes_nome'])['upgrade'].sum().reset_index().sort_values('mes_num')
-        st.plotly_chart(px.bar(df_u, x='mes_nome', y='upgrade', title="Evolução de Upsell", color_discrete_sequence=['#9B59B6']), use_container_width=True)
+        df_u = df_ano[df_ano['upgrade'] > 0].groupby(['mes_num','mes_nome']).agg({'upgrade':'sum', 'cliente':'count'}).reset_index().sort_values('mes_num')
+        fig = px.bar(df_u, x='mes_nome', y='upgrade', text='cliente', title="Evolução de Upsell", color_discrete_sequence=['#9B59B6'])
+        fig.update_traces(texttemplate='%{text}', textposition='inside')
+        fig.update_layout(xaxis_title=None, yaxis_title=None)
+        st.plotly_chart(fig, use_container_width=True)
         
     with col3:
-        df_c = df_ano[df_ano['status'] == 'Cancelada'].groupby(['mes_num','mes_nome'])['mrr'].sum().reset_index().sort_values('mes_num')
-        st.plotly_chart(px.bar(df_c, x='mes_nome', y='mrr', title="Churn Mensal", color_discrete_sequence=['#E74C3C']), use_container_width=True)
+        df_c = df_ano[df_ano['status'] == 'Cancelada'].groupby(['mes_num','mes_nome']).agg({'mrr':'sum', 'cliente':'count'}).reset_index().sort_values('mes_num')
+        df_c = df_c[df_c['mrr'] > 0]
+        fig = px.bar(df_c, x='mes_nome', y='mrr', text='cliente', title="Churn Mensal", color_discrete_sequence=['#E74C3C'])
+        fig.update_traces(texttemplate='%{text}', textposition='inside')
+        fig.update_layout(xaxis_title=None, yaxis_title=None)
+        st.plotly_chart(fig, use_container_width=True)
 
     st.divider()
     
-    # Metas Acumuladas
     st.subheader("🎯 Performance vs. Metas")
     col4, col5 = st.columns(2)
     
@@ -169,27 +170,30 @@ if df is not None:
         fig = go.Figure()
         fig.add_trace(go.Bar(x=df_meta['mes_nome'], y=df_meta['mrr_a'], name='Real', marker_color='#2ECC71'))
         fig.add_trace(go.Scatter(x=df_meta['mes_nome'], y=df_meta['meta_m'], name='Meta (8k/mês)', line=dict(color='#F1C40F', width=4)))
+        fig.update_layout(title="MRR Acumulado vs. Meta", xaxis_title=None, yaxis_title=None)
         st.plotly_chart(fig, use_container_width=True)
 
     with col5:
         fig = go.Figure()
         fig.add_trace(go.Bar(x=df_meta['mes_nome'], y=df_meta['cont_a'], name='Real', marker_color='#3498DB'))
         fig.add_trace(go.Scatter(x=df_meta['mes_nome'], y=df_meta['meta_c'], name='Meta (17/mês)', line=dict(color='#F39C12', width=4)))
+        fig.update_layout(title="Contratos Acumulados vs. Meta", xaxis_title=None, yaxis_title=None)
         st.plotly_chart(fig, use_container_width=True)
 
     st.divider()
     
-    # Análise Temporal e Produto
     col6, col7 = st.columns(2)
     with col6:
         df_s = df_f[df_f['status'] == 'Confirmada'].groupby('inicio_semana')['mrr'].sum().reset_index().sort_values('inicio_semana')
         df_s['data_s'] = df_s['inicio_semana'].dt.strftime('%d/%m/%Y')
         fig = go.Figure(go.Scatter(x=df_s['data_s'], y=df_s['mrr'], mode='lines+markers+text', text=df_s['mrr'].apply(lambda x: f"{x:,.0f}"), textposition="top center", line=dict(color='#1A3A5A', width=4)))
-        fig.update_layout(title="MRR SEMANA", showlegend=False)
+        fig.update_layout(title="MRR SEMANA", xaxis_title=None, yaxis_title=None, showlegend=False)
         st.plotly_chart(fig, use_container_width=True)
     
     with col7:
-        st.plotly_chart(px.pie(df_f, names='produto', values='mrr', title="Receita por Produto", hole=0.4), use_container_width=True)
+        fig = px.pie(df_f, names='produto', values='mrr', title="Receita por Produto", hole=0.4)
+        fig.update_layout(xaxis_title=None, yaxis_title=None)
+        st.plotly_chart(fig, use_container_width=True)
 
     st.subheader("📋 Detalhamento")
     st.dataframe(df_f[['data', 'cliente', 'vendedor', 'produto', 'status', 'mrr', 'upgrade', 'adesao']].sort_values('data', ascending=False), use_container_width=True)
