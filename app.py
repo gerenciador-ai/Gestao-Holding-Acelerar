@@ -6,7 +6,7 @@ from datetime import datetime
 # Configuração da página - Estilo Sênior
 st.set_page_config(
     layout="wide", 
-    page_title="Dashboard Comercial Otimizado",
+    page_title="Dashboard Comercial Estratégico",
     page_icon="📊"
 )
 
@@ -25,8 +25,6 @@ def load_data(sheet_id, gid=None):
     try:
         df = pd.read_csv(url )
         df.columns = df.columns.str.strip()
-        # Remover linhas completamente vazias que o Sheets costuma exportar
-        df = df.dropna(how='all')
         return df
     except Exception as e:
         st.error(f"Erro crítico ao carregar dados: {e}")
@@ -60,14 +58,14 @@ def processar_dados():
     if df_vendas.empty:
         return None
 
-    # Mapeamento Dinâmico de Colunas
+    # Mapeamento de Colunas - Foco na Data de Ativação (Coluna H)
     map_cols = {
         'vendedor': encontrar_coluna(df_vendas, 'vendedor'),
         'sdr': encontrar_coluna(df_vendas, 'sdr'),
         'cliente': encontrar_coluna(df_vendas, 'cliente'),
         'cnpj': encontrar_coluna(df_vendas, 'cnpj'),
         'plano': encontrar_coluna(df_vendas, 'plano'),
-        'data': encontrar_coluna(df_vendas, 'data'),
+        'data_ativacao': encontrar_coluna(df_vendas, 'Data de Ativação'), # Coluna H
         'mrr': encontrar_coluna(df_vendas, 'Mensalidade - Simples'),
         'adesao_s': encontrar_coluna(df_vendas, 'Adesão - Simples'),
         'adesao_r': encontrar_coluna(df_vendas, 'Adesão - Recupera'),
@@ -82,35 +80,36 @@ def processar_dados():
     df['cliente'] = df_vendas[map_cols['cliente']] if map_cols['cliente'] else "N/A"
     df['plano'] = df_vendas[map_cols['plano']] if map_cols['plano'] else "N/A"
     
-    # Engenharia de Datas Robusta (Correção do Erro de Atributo)
-    if map_cols['data']:
-        df['data'] = pd.to_datetime(df_vendas[map_cols['data']], errors='coerce', dayfirst=True)
-        # Filtrar apenas linhas com datas válidas para evitar erros em cálculos temporais
-        df = df.dropna(subset=['data']).copy()
-        
-        df['mes_ano'] = df['data'].dt.strftime('%Y-%m')
-        df['semana'] = df['data'].dt.isocalendar().week
-        # Abordagem segura para início da semana (Segunda-feira)
-        df['inicio_semana'] = df['data'].dt.to_period('W').apply(lambda r: r.start_time)
+    # Engenharia de Datas baseada na Data de Ativação
+    if map_cols['data_ativacao']:
+        df['data'] = pd.to_datetime(df_vendas[map_cols['data_ativacao']], errors='coerce', dayfirst=True)
+        # Criar colunas temporais apenas para datas válidas
+        df['mes_ano'] = df['data'].dt.strftime('%Y-%m').fillna("N/A")
+        df['semana'] = df['data'].dt.isocalendar().week.fillna(0)
+        # Início da semana (Segunda-feira) - Tratamento seguro para NaT
+        df['inicio_semana'] = df['data'].apply(lambda x: x - pd.Timedelta(days=x.weekday()) if pd.notnull(x) else pd.NaT)
     else:
-        return None # Sem data não há dashboard funcional
+        df['data'] = pd.NaT
+        df['mes_ano'] = "N/A"
 
-    # Processamento Financeiro (usando o índice do df filtrado por data)
-    idx = df.index
-    df['mrr'] = parse_currency(df_vendas.loc[idx, map_cols['mrr']]) if map_cols['mrr'] else 0.0
-    df['adesao'] = parse_currency(df_vendas.loc[idx, map_cols['adesao_s']]) + parse_currency(df_vendas.loc[idx, map_cols['adesao_r']])
-    df['upgrade'] = parse_currency(df_vendas.loc[idx, map_cols['upgrade']]) if map_cols['upgrade'] else 0.0
-    df['downgrade'] = parse_currency(df_vendas.loc[idx, map_cols['downgrade']]) if map_cols['downgrade'] else 0.0
+    # Processamento Financeiro
+    df['mrr'] = parse_currency(df_vendas[map_cols['mrr']]) if map_cols['mrr'] else 0.0
+    df['adesao'] = parse_currency(df_vendas[map_cols['adesao_s']]) + parse_currency(df_vendas[map_cols['adesao_r']])
+    df['upgrade'] = parse_currency(df_vendas[map_cols['upgrade']]) if map_cols['upgrade'] else 0.0
+    df['downgrade'] = parse_currency(df_vendas[map_cols['downgrade']]) if map_cols['downgrade'] else 0.0
     df['receita_total'] = df['mrr'] + df['adesao']
 
     # Cruzamento de Cancelados (Churn)
     df['status'] = 'Confirmada'
     if map_cols['cnpj'] and not df_cancelados.empty:
-        vendas_cnpj = df_vendas.loc[idx, map_cols['cnpj']].astype(str).str.replace(r'\D', '', regex=True)
+        vendas_cnpj = df_vendas[map_cols['cnpj']].astype(str).str.replace(r'\D', '', regex=True)
         col_cnpj_canc = encontrar_coluna(df_cancelados, 'cnpj')
         if col_cnpj_canc:
             canc_cnpjs = df_cancelados[col_cnpj_canc].astype(str).str.replace(r'\D', '', regex=True).unique()
             df.loc[vendas_cnpj.isin(canc_cnpjs), 'status'] = 'Cancelada'
+    
+    # Remover linhas onde não há cliente nem vendedor (linhas vazias da planilha)
+    df = df[~((df['cliente'] == "N/A") & (df['vendedor'] == "N/A"))]
     
     return df
 
@@ -124,7 +123,8 @@ if df is not None and not df.empty:
     st.sidebar.header("🔍 Filtros de Análise")
     
     # Filtro de Mês/Ano
-    meses = ["Todos"] + sorted(df['mes_ano'].unique().tolist(), reverse=True)
+    meses_lista = sorted([m for m in df['mes_ano'].unique() if m != "N/A"], reverse=True)
+    meses = ["Todos"] + meses_lista
     mes_sel = st.sidebar.selectbox("Período (Mês/Ano)", meses)
     
     # Filtro de Vendedor
@@ -183,4 +183,4 @@ if df is not None and not df.empty:
     st.dataframe(df_f[cols_view].sort_values('data', ascending=False), use_container_width=True)
 
 else:
-    st.error("Nenhum dado válido encontrado para o período selecionado ou erro na conexão.")
+    st.error("Nenhum dado válido encontrado. Verifique se a coluna 'Data de Ativação' está preenchida na planilha.")
