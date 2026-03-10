@@ -2,332 +2,198 @@ import pandas as pd
 import streamlit as st
 import plotly.express as px
 import plotly.graph_objects as go
-import requests
-from io import StringIO
-from PIL import Image
+from datetime import datetime
 
-# ===== CONFIGURAÇÃO DE PÁGINA E TEMA =====
-st.set_page_config(
-    page_title="Dashboard Comercial - Acelerar.tech",
-    page_icon="📊",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
+# Configuração da página - Estilo Sênior Limpo
+st.set_page_config(layout="wide", page_title="Dashboard Comercial Estratégico", page_icon="📊")
 
-# ===== PALETA DE CORES ACELERAR.TECH =====
-CORES = {
-    "azul_escuro": "#0D3B66",      # Azul escuro primário
-    "azul_claro": "#6DAFDB",       # Azul claro secundário
-    "branco": "#FFFFFF",           # Branco
-    "cinza_suave": "#F5F5F5",      # Cinza suave
-    "azul_muito_claro": "#E8F4F8", # Azul muito claro para backgrounds
-}
+# IDs e GIDs das planilhas Google Sheets (agora referenciando VMC Tech)
+VENDAS_ID = "1df7wNT1XQaiVK38vNdjbQudXkeH-lHTZWoYQ9gikZ0M" # Vendas Realizadas_VMC Tech
+VENDAS_GID = "1202307787"
+CANCELADOS_ID = "1GDU6qVJ9Gf9C9lwHx2KwOiTltyeUPWhD_y3ODUczuTw" # Cancelados_VMC Tech
+CANCELADOS_GID = "606807719"
 
-# ===== CSS PERSONALIZADO PARA TEMA =====
-css_personalizado = f"""
-<style>
-    /* Configuração geral */
-    :root {{
-        --primary-color: {CORES['azul_escuro']};
-        --secondary-color: {CORES['azul_claro']};
-        --background-color: {CORES['cinza_suave']};
-        --text-color: {CORES['azul_escuro']};
-    }}
-    
-    /* Sidebar */
-    [data-testid="stSidebar"] {{
-        background-color: {CORES['azul_escuro']};
-    }}
-    
-    [data-testid="stSidebar"] * {{
-        color: {CORES['branco']};
-    }}
-    
-    /* Headers */
-    h1, h2, h3 {{
-        color: {CORES['azul_escuro']};
-        font-weight: 700;
-    }}
-    
-    /* Texto geral */
-    body {{
-        background-color: {CORES['cinza_suave']};
-        color: {CORES['azul_escuro']};
-    }}
-    
-    /* Métrica (KPI) */
-    [data-testid="metric-container"] {{
-        background-color: {CORES['branco']};
-        border-left: 4px solid {CORES['azul_claro']};
-        border-radius: 8px;
-        padding: 15px;
-        box-shadow: 0 2px 8px rgba(13, 59, 102, 0.1);
-    }}
-    
-    /* Dividers */
-    hr {{
-        border-color: {CORES['azul_claro']};
-    }}
-</style>
-"""
-
-st.markdown(css_personalizado, unsafe_allow_html=True)
-
-# ===== LOGO FIXO NO CANTO SUPERIOR ESQUERDO =====
-col_logo, col_titulo = st.columns([1, 5])
-
-with col_logo:
+@st.cache_data(ttl=600)
+def load_data(sheet_id, gid=None):
+    url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv"
+    if gid: url += f"&gid={gid}"
     try:
-        logo = Image.open('/home/ubuntu/logo_acelerar.png')
-        # Redimensionar logo para caber bem
-        logo = logo.resize((120, 120))
-        st.image(logo, use_column_width=True)
-    except:
-        st.warning("Logo não encontrado")
-
-with col_titulo:
-    st.markdown(f"""
-    <div style="padding: 20px 0;">
-        <h1 style="color: {CORES['azul_escuro']}; margin: 0;">📊 Dashboard Comercial</h1>
-        <p style="color: {CORES['azul_claro']}; font-size: 14px; margin: 5px 0;">Acelerar.tech - Relatório de Vendas e Cancelamentos</p>
-    </div>
-    """, unsafe_allow_html=True)
-
-st.divider()
-
-# ===== FUNÇÃO PARA CARREGAR DADOS =====
-@st.cache_data(ttl=3600)
-def load_data(url):
-    try:
-        response = requests.get(url)
-        response.raise_for_status()
-        data = StringIO(response.text)
-        df = pd.read_csv(data)
+        df = pd.read_csv(url )
+        df.columns = df.columns.str.strip()
         return df
-    except requests.exceptions.RequestException as e:
+    except Exception as e:
         st.error(f"Erro ao carregar dados: {e}")
         return pd.DataFrame()
-    except Exception as e:
-        st.error(f"Erro inesperado: {e}")
-        return pd.DataFrame()
 
-# ===== CARREGAR DADOS =====
-URL_VENDAS = "https://docs.google.com/spreadsheets/d/1df7wNT1XQaiVK38vNdjbQudXkeH-lHTZWoYQ9gikZ0M/gviz/tq?tqx=out:csv&sheet=Vendas%20Realizadas"
-URL_CANCELADOS = "https://docs.google.com/spreadsheets/d/1GDU6qVJ9Gf9C9lwHx2KwOiTltyeUPWhD_y3ODUczuTw/gviz/tq?tqx=out:csv&sheet=Cancelados"
+def parse_currency(series):
+    def clean_val(val):
+        if pd.isna(val) or val == "": return 0.0
+        if isinstance(val, (int, float)): return float(val)
+        s = str(val).replace("R$", "").strip()
+        if not s: return 0.0
+        if "," in s: s = s.replace(".", "").replace(",", ".")
+        elif "." in s:
+            parts = s.split(".")
+            if len(parts[-1]) != 2: s = s.replace(".", "")
+        try: return float(s)
+        except: return 0.0
+    return series.apply(clean_val)
 
-df_vendas = load_data(URL_VENDAS)
-df_cancelados = load_data(URL_CANCELADOS)
+def processar_dados():
+    df_v = load_data(VENDAS_ID, VENDAS_GID)
+    df_c = load_data(CANCELADOS_ID, CANCELADOS_GID)
+    if df_v.empty: return None
 
-if df_vendas.empty or df_cancelados.empty:
-    st.error("Erro ao carregar os dados das planilhas.")
-    st.stop()
+    df = pd.DataFrame()
+    df["vendedor"] = df_v["Vendedor"].fillna("N/A")
+    df["sdr"] = df_v["SDR"].fillna("N/A")
+    df["cliente"] = df_v["Cliente"].fillna("N/A")
+    df["cnpj"] = df_v["CNPJ do Cliente"].astype(str).str.replace(r"\D", "", regex=True)
+    df["produto"] = df_v["Qual produto?"].fillna("Sittax Simples")
+    df.loc[df["produto"].astype(str).str.strip() == "", "produto"] = "Sittax Simples"
 
-# ===== PRÉ-PROCESSAMENTO =====
-df_vendas.columns = df_vendas.columns.str.strip()
-df_cancelados.columns = df_cancelados.columns.str.strip()
+    df["mrr"] = parse_currency(df_v["Mensalidade - Simples"])
+    df["adesao"] = parse_currency(df_v["Adesão - Simples"]) + parse_currency(df_v["Adesão - Recupera"])
+    df["upgrade"] = parse_currency(df_v["Aumento da mensalidade"])
+    df["downgrade"] = parse_currency(df_v["Redução da mensalidade"])
 
-# Renomear colunas
-df_vendas = df_vendas.rename(columns={
-    'Data da Venda': 'Data_Venda',
-    'CNPJ do Cliente': 'CNPJ_Cliente',
-    'Valor da Venda': 'Valor_Venda',
-    'Nome do Vendedor': 'Nome_Vendedor',
-    'Plano Contratado': 'Plano_Contratado'
-})
-
-df_cancelados = df_cancelados.rename(columns={
-    'CNPJ do Cliente': 'CNPJ_Cliente',
-    'Data de Cancelamento': 'Data_Cancelamento'
-})
-
-# Converter datas
-df_vendas['Data_Venda'] = pd.to_datetime(df_vendas['Data_Venda'], errors='coerce')
-df_cancelados['Data_Cancelamento'] = pd.to_datetime(df_cancelados['Data_Cancelamento'], errors='coerce')
-
-# Mesclar dados
-df_merged = pd.merge(df_vendas, df_cancelados, on='CNPJ_Cliente', how='left', suffixes=('_Venda', '_Cancelamento'))
-df_merged['Status'] = df_merged['Data_Cancelamento'].apply(lambda x: 'Cancelado' if pd.notna(x) else 'Ativo')
-df_merged['Valor_Liquido'] = df_merged.apply(lambda row: 0 if row['Status'] == 'Cancelado' else row['Valor_Venda'], axis=1)
-
-# ===== FILTROS NA SIDEBAR =====
-st.sidebar.markdown(f"<h2 style='color: {CORES['branco']}; text-align: center;'>🔍 Filtros</h2>", unsafe_allow_html=True)
-st.sidebar.divider()
-
-data_min = df_merged['Data_Venda'].min().date()
-data_max = df_merged['Data_Venda'].max().date()
-
-data_inicio, data_fim = st.sidebar.date_input(
-    "Período",
-    value=(data_min, data_max),
-    min_value=data_min,
-    max_value=data_max
-)
-
-vendedores = ['Todos'] + sorted(df_merged['Nome_Vendedor'].dropna().unique().tolist())
-vendedor_selecionado = st.sidebar.selectbox("Vendedor", vendedores)
-
-planos = ['Todos'] + sorted(df_merged['Plano_Contratado'].dropna().unique().tolist())
-plano_selecionado = st.sidebar.selectbox("Plano", planos)
-
-# ===== APLICAR FILTROS =====
-df_filtered = df_merged[(df_merged['Data_Venda'].dt.date >= data_inicio) & (df_merged['Data_Venda'].dt.date <= data_fim)]
-
-if vendedor_selecionado != 'Todos':
-    df_filtered = df_filtered[df_filtered['Nome_Vendedor'] == vendedor_selecionado]
-
-if plano_selecionado != 'Todos':
-    df_filtered = df_filtered[df_filtered['Plano_Contratado'] == plano_selecionado]
-
-# ===== SEÇÃO DE KPIs =====
-st.markdown(f"<h2 style='color: {CORES['azul_escuro']}; border-bottom: 3px solid {CORES['azul_claro']}; padding-bottom: 10px;'>📊 Principais Indicadores de Desempenho (KPIs)</h2>", unsafe_allow_html=True)
-
-col1, col2, col3, col4, col5, col6 = st.columns(6)
-
-# Calcular KPIs
-vendas_brutas = df_filtered['Valor_Venda'].sum()
-vendas_liquidas = df_filtered['Valor_Liquido'].sum()
-total_vendas = len(df_filtered)
-total_cancelamentos = len(df_filtered[df_filtered['Status'] == 'Cancelado'])
-taxa_cancelamento = (total_cancelamentos / total_vendas * 100) if total_vendas > 0 else 0
-ticket_medio = vendas_liquidas / total_vendas if total_vendas > 0 else 0
-
-# Exibir KPIs com estilo personalizado
-kpis = [
-    (col1, "Vendas Brutas", f"R$ {vendas_brutas:,.2f}", "💰"),
-    (col2, "Vendas Líquidas", f"R$ {vendas_liquidas:,.2f}", "📈"),
-    (col3, "Total de Vendas", f"{total_vendas}", "🛍️"),
-    (col4, "Cancelamentos", f"{total_cancelamentos}", "❌"),
-    (col5, "Taxa de Cancelamento", f"{taxa_cancelamento:.2f}%", "📉"),
-    (col6, "Ticket Médio", f"R$ {ticket_medio:,.2f}", "🎯"),
-]
-
-for col, titulo, valor, emoji in kpis:
-    with col:
-        st.markdown(f"""
-        <div style="
-            background-color: {CORES['branco']};
-            border-left: 4px solid {CORES['azul_claro']};
-            border-radius: 8px;
-            padding: 15px;
-            box-shadow: 0 2px 8px rgba(13, 59, 102, 0.1);
-            text-align: center;
-        ">
-            <p style="color: {CORES['azul_claro']}; font-size: 24px; margin: 0;">{emoji}</p>
-            <p style="color: {CORES['azul_escuro']}; font-size: 12px; margin: 5px 0; font-weight: 600;">{titulo}</p>
-            <p style="color: {CORES['azul_escuro']}; font-size: 18px; margin: 0; font-weight: 700;">{valor}</p>
-        </div>
-        """, unsafe_allow_html=True)
-
-st.divider()
-
-# ===== SEÇÃO DE GRÁFICOS =====
-st.markdown(f"<h2 style='color: {CORES['azul_escuro']}; border-bottom: 3px solid {CORES['azul_claro']}; padding-bottom: 10px;'>📈 Análises Visuais</h2>", unsafe_allow_html=True)
-
-# Gráfico 1: Evolução de Vendas Líquidas
-col1, col2 = st.columns(2)
-
-with col1:
-    st.subheader("Evolução das Vendas Líquidas ao Longo do Tempo")
-    df_vendas_por_data = df_filtered.groupby('Data_Venda')['Valor_Liquido'].sum().reset_index()
+    # Padronização para Formato Americano (Mês/Dia/Ano)
+    df["data_h"] = pd.to_datetime(df_v["Data de Ativação"], errors="coerce", dayfirst=False)
+    df["data_x"] = pd.to_datetime(df_v["Data alteração de CNPJ"], errors="coerce", dayfirst=False)
     
-    fig_line = px.line(
-        df_vendas_por_data,
-        x='Data_Venda',
-        y='Valor_Liquido',
-        labels={'Valor_Liquido': 'Vendas Líquidas (R$)', 'Data_Venda': 'Data'},
-        color_discrete_sequence=[CORES['azul_claro']]
-    )
-    fig_line.update_layout(
-        plot_bgcolor=CORES['cinza_suave'],
-        paper_bgcolor=CORES['branco'],
-        font=dict(color=CORES['azul_escuro'], family="Arial"),
-        hovermode='x unified',
-        margin=dict(l=0, r=0, t=0, b=0)
-    )
-    fig_line.update_traces(line=dict(color=CORES['azul_claro'], width=3))
-    st.plotly_chart(fig_line, use_container_width=True)
-
-# Gráfico 2: Ranking de Vendedores
-with col2:
-    st.subheader("Ranking de Vendedores por Vendas Líquidas")
-    df_vendas_por_vendedor = df_filtered.groupby('Nome_Vendedor')['Valor_Liquido'].sum().reset_index().sort_values('Valor_Liquido', ascending=True)
+    df["data"] = df["data_h"]
+    df.loc[df["upgrade"] > 0, "data"] = df["data_x"]
     
-    fig_bar = px.barh(
-        df_vendas_por_vendedor,
-        x='Valor_Liquido',
-        y='Nome_Vendedor',
-        labels={'Valor_Liquido': 'Vendas Líquidas (R$)', 'Nome_Vendedor': 'Vendedor'},
-        color_discrete_sequence=[CORES['azul_claro']]
-    )
-    fig_bar.update_layout(
-        plot_bgcolor=CORES['cinza_suave'],
-        paper_bgcolor=CORES['branco'],
-        font=dict(color=CORES['azul_escuro'], family="Arial"),
-        margin=dict(l=0, r=0, t=0, b=0)
-    )
-    st.plotly_chart(fig_bar, use_container_width=True)
+    df = df.dropna(subset=["data"])
+    df["ano"] = df["data"].dt.year.astype(int)
+    df["mes_num"] = df["data"].dt.month.astype(int)
+    meses_pt = {1:"Janeiro", 2:"Fevereiro", 3:"Março", 4:"Abril", 5:"Maio", 6:"Junho",
+                7:"Julho", 8:"Agosto", 9:"Setembro", 10:"Outubro", 11:"Novembro", 12:"Dezembro"}
+    df["mes_nome"] = df["mes_num"].map(meses_pt)
+    df["inicio_semana"] = df["data"].apply(lambda x: x - pd.Timedelta(days=x.weekday()))
 
-# Gráfico 3: Distribuição por Plano
-col1, col2 = st.columns(2)
-
-with col1:
-    st.subheader("Distribuição de Vendas por Plano")
-    df_vendas_por_plano = df_filtered.groupby('Plano_Contratado')['Valor_Liquido'].sum().reset_index()
+    df["status"] = "Confirmada"
+    if not df_c.empty:
+        canc_cnpjs = df_c["CNPJ do Cliente"].astype(str).str.replace(r"\D", "", regex=True).unique()
+        df.loc[df["cnpj"].isin(canc_cnpjs), "status"] = "Cancelada"
     
-    fig_pie = px.pie(
-        df_vendas_por_plano,
-        values='Valor_Liquido',
-        names='Plano_Contratado',
-        color_discrete_sequence=[CORES['azul_escuro'], CORES['azul_claro'], CORES['azul_muito_claro'], "#4A90C4"]
-    )
-    fig_pie.update_layout(
-        paper_bgcolor=CORES['branco'],
-        font=dict(color=CORES['azul_escuro'], family="Arial"),
-        margin=dict(l=0, r=0, t=0, b=0)
-    )
-    st.plotly_chart(fig_pie, use_container_width=True)
+    return df
 
-# Gráfico 4: Status das Vendas
-with col2:
-    st.subheader("Distribuição por Status")
-    df_status = df_filtered['Status'].value_counts().reset_index()
-    df_status.columns = ['Status', 'Quantidade']
+# --- UI ---
+df = processar_dados()
+if df is not None:
+    st.title("📊 Dashboard Comercial Estratégico")
     
-    fig_status = px.bar(
-        df_status,
-        x='Status',
-        y='Quantidade',
-        labels={'Quantidade': 'Quantidade', 'Status': 'Status'},
-        color='Status',
-        color_discrete_map={'Ativo': CORES['azul_claro'], 'Cancelado': '#E74C3C'}
-    )
-    fig_status.update_layout(
-        plot_bgcolor=CORES['cinza_suave'],
-        paper_bgcolor=CORES['branco'],
-        font=dict(color=CORES['azul_escuro'], family="Arial"),
-        showlegend=False,
-        margin=dict(l=0, r=0, t=0, b=0)
-    )
-    st.plotly_chart(fig_status, use_container_width=True)
+    st.sidebar.header("🔍 Filtros")
+    anos = sorted(df["ano"].unique(), reverse=True)
+    ano_sel = st.sidebar.selectbox("Ano", anos)
+    df_ano = df[df["ano"] == ano_sel]
+    
+    meses_ordem = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"]
+    meses_disp = [m for m in meses_ordem if m in df_ano["mes_nome"].unique()]
+    meses_sel = st.sidebar.multiselect("Meses", meses_disp, default=meses_disp)
+    
+    prod_sel = st.sidebar.selectbox("Produto", ["Todos"] + sorted(df["produto"].unique().tolist()))
+    vend_sel = st.sidebar.selectbox("Vendedor", ["Todos"] + sorted(df["vendedor"].unique().tolist()))
+    sdr_sel = st.sidebar.selectbox("SDR", ["Todos"] + sorted(df["sdr"].unique().tolist()))
 
-st.divider()
+    df_f = df_ano[df_ano["mes_nome"].isin(meses_sel)].copy()
+    if prod_sel != "Todos": df_f = df_f[df_f["produto"] == prod_sel]
+    if vend_sel != "Todos": df_f = df_f[df_f["vendedor"] == vend_sel]
+    if sdr_sel != "Todos": df_f = df_f[df_f["sdr"] == sdr_sel]
 
-# ===== TABELA DETALHADA =====
-st.markdown(f"<h2 style='color: {CORES['azul_escuro']}; border-bottom: 3px solid {CORES['azul_claro']}; padding-bottom: 10px;'>📋 Tabela Detalhada de Vendas</h2>", unsafe_allow_html=True)
+    # KPIs
+    mrr_conq = df_f[df_f["status"] == "Confirmada"]["mrr"].sum()
+    mrr_perd = df_f[df_f["status"] == "Cancelada"]["mrr"].sum()
+    upsell_v = df_f["upgrade"].sum()
+    upsell_q = len(df_f[df_f["upgrade"] > 0])
+    cl_fech = len(df_f[(df_f["status"] == "Confirmada") & (df_f["mrr"] > 0)])
+    cl_canc = len(df_f[df_f["status"] == "Cancelada"])
+    tkt_med = mrr_conq / cl_fech if cl_fech > 0 else 0
+    base_ativa = len(df[df["status"] == "Confirmada"]) - len(df[df["status"] == "Cancelada"])
+    churn_p = (mrr_perd / mrr_conq * 100) if mrr_conq > 0 else 0
 
-colunas_exibicao = ['Nome_Vendedor', 'CNPJ_Cliente', 'Plano_Contratado', 'Valor_Venda', 'Data_Venda', 'Status']
-colunas_disponiveis = [col for col in colunas_exibicao if col in df_filtered.columns]
+    c1, c2, c3 = st.columns(3)
+    c1.metric("MRR Conquistado", f"R$ {mrr_conq:,.2f}")
+    c2.metric("MRR Ativo (Net)", f"R$ {mrr_conq - mrr_perd:,.2f}")
+    c3.metric("MRR Perdido (Churn)", f"R$ {mrr_perd:,.2f}", delta=f"{churn_p:.1f}%", delta_color="inverse")
+    
+    c4, c5, c6 = st.columns(3)
+    c4.metric("Total de Upsell", f"R$ {upsell_v:,.2f}", delta=f"{upsell_q} eventos")
+    c5.metric("Ticket Médio", f"R$ {tkt_med:,.2f}")
+    c6.metric("Adesão Total", f"R$ {df_f["adesao"].sum():,.2f}")
+    
+    c7, c8, c9 = st.columns(3)
+    c7.metric("Clientes fechado (no periodo)", cl_fech)
+    c8.metric("Clientes Cancelados (no periodo)", cl_canc)
+    c9.metric("Total Clientes Ativos (Base)", base_ativa)
 
-df_tabela = df_filtered[colunas_disponiveis].copy()
-df_tabela['Valor_Venda'] = df_tabela['Valor_Venda'].apply(lambda x: f"R$ {x:,.2f}")
-df_tabela = df_tabela.sort_values('Data_Venda', ascending=False)
+    st.divider()
+    
+    st.subheader("📈 Evolução Mensal")
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        df_m = df_ano[df_ano["status"] == "Confirmada"].groupby(["mes_num","mes_nome"]).agg({"mrr":"sum", "cliente":"count"}).reset_index().sort_values("mes_num")
+        fig = px.bar(df_m, x="mes_nome", y="mrr", text="cliente", title="MRR Conquistado", color_discrete_sequence=["#2ECC71"])
+        fig.update_traces(texttemplate="%{text}", textposition="inside")
+        fig.update_layout(xaxis_title=None, yaxis_title=None)
+        st.plotly_chart(fig, use_container_width=True)
+    
+    with col2:
+        df_u = df_ano[df_ano["upgrade"] > 0].groupby(["mes_num","mes_nome"]).agg({"upgrade":"sum", "cliente":"count"}).reset_index().sort_values("mes_num")
+        fig = px.bar(df_u, x="mes_nome", y="upgrade", text="cliente", title="Evolução de Upsell", color_discrete_sequence=["#9B59B6"])
+        fig.update_traces(texttemplate="%{text}", textposition="inside")
+        fig.update_layout(xaxis_title=None, yaxis_title=None)
+        st.plotly_chart(fig, use_container_width=True)
+        
+    with col3:
+        df_c = df_ano[df_ano["status"] == "Cancelada"].groupby(["mes_num","mes_nome"]).agg({"mrr":"sum", "cliente":"count"}).reset_index().sort_values("mes_num")
+        df_c = df_c[df_c["mrr"] > 0]
+        fig = px.bar(df_c, x="mes_nome", y="mrr", text="cliente", title="Churn Mensal", color_discrete_sequence=["#E74C3C"])
+        fig.update_traces(texttemplate="%{text}", textposition="inside")
+        fig.update_layout(xaxis_title=None, yaxis_title=None)
+        st.plotly_chart(fig, use_container_width=True)
 
-st.dataframe(df_tabela, use_container_width=True, hide_index=True)
+    st.divider()
+    
+    st.subheader("🎯 Performance vs. Metas")
+    col4, col5 = st.columns(2)
+    
+    df_meta = df_f[df_f["status"] == "Confirmada"].groupby(["mes_num","mes_nome"]).agg({"mrr":"sum", "cliente":"count"}).reset_index().sort_values("mes_num")
+    df_meta["mrr_a"] = df_meta["mrr"].cumsum()
+    df_meta["cont_a"] = df_meta["cliente"].cumsum()
+    df_meta["meta_m"] = [8000 * (i+1) for i in range(len(df_meta))]
+    df_meta["meta_c"] = [17 * (i+1) for i in range(len(df_meta))]
 
-# ===== RODAPÉ =====
-st.divider()
-st.markdown(f"""
-<div style="text-align: center; padding: 20px; color: {CORES['azul_claro']}; font-size: 12px;">
-    <p>Dashboard Comercial - Acelerar.tech © 2024 | Todos os direitos reservados</p>
-</div>
-""", unsafe_allow_html=True)
+    with col4:
+        fig = go.Figure()
+        fig.add_trace(go.Bar(x=df_meta["mes_nome"], y=df_meta["mrr_a"], name="Real", marker_color="#2ECC71"))
+        fig.add_trace(go.Scatter(x=df_meta["mes_nome"], y=df_meta["meta_m"], name="Meta (8k/mês)", line=dict(color="#F1C40F", width=4)))
+        fig.update_layout(title="MRR Acumulado vs. Meta", xaxis_title=None, yaxis_title=None)
+        st.plotly_chart(fig, use_container_width=True)
+
+    with col5:
+        fig = go.Figure()
+        fig.add_trace(go.Bar(x=df_meta["mes_nome"], y=df_meta["cont_a"], name="Real", marker_color="#3498DB"))
+        fig.add_trace(go.Scatter(x=df_meta["mes_nome"], y=df_meta["meta_c"], name="Meta (17/mês)", line=dict(color="#F39C12", width=4)))
+        fig.update_layout(title="Contratos Acumulados vs. Meta", xaxis_title=None, yaxis_title=None)
+        st.plotly_chart(fig, use_container_width=True)
+
+    st.divider()
+    
+    col6, col7 = st.columns(2)
+    with col6:
+        df_s = df_f[df_f["status"] == "Confirmada"].groupby("inicio_semana")["mrr"].sum().reset_index().sort_values("inicio_semana")
+        df_s["data_s"] = df_s["inicio_semana"].dt.strftime("%d/%m/%Y")
+        fig = go.Figure(go.Scatter(x=df_s["data_s"], y=df_s["mrr"], mode="lines+markers+text", text=df_s["mrr"].apply(lambda x: f"{x:,.0f}"), textposition="top center", line=dict(color="#1A3A5A", width=4)))
+        fig.update_layout(title="MRR SEMANA", xaxis_title=None, yaxis_title=None, showlegend=False)
+        st.plotly_chart(fig, use_container_width=True)
+    
+    with col7:
+        fig = px.pie(df_f, names="produto", values="mrr", title="Receita por Produto", hole=0.4)
+        fig.update_layout(xaxis_title=None, yaxis_title=None)
+        st.plotly_chart(fig, use_container_width=True)
+
+    st.subheader("📋 Detalhamento")
+    st.dataframe(df_f[["data", "cliente", "vendedor", "produto", "status", "mrr", "upgrade", "adesao"]].sort_values("data", ascending=False), use_container_width=True)
