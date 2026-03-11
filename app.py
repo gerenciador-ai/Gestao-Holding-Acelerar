@@ -2,7 +2,7 @@ import pandas as pd
 import streamlit as st
 import plotly.express as px
 import plotly.graph_objects as go
-from datetime import datetime
+from datetime import datetime, timedelta
 import base64
 
 # Configuração da página - Estilo Sênior Premium
@@ -181,6 +181,63 @@ def processar_dados():
         df.loc[df['cnpj'].isin(canc_cnpjs), 'status'] = 'Cancelada'
     
     return df, df_cr
+
+def processar_contas_receber(df_cr):
+    """Processa a base de Contas a Receber e calcula aging"""
+    if df_cr is None or df_cr.empty:
+        return None
+    
+    df = df_cr.copy()
+    
+    # Limpar colunas e converter valores
+    df.columns = df.columns.str.strip()
+    
+    # Converter coluna de valor para numérico
+    valor_col = None
+    for col in df.columns:
+        if 'valor' in col.lower() or 'amount' in col.lower():
+            valor_col = col
+            break
+    
+    if valor_col:
+        df['valor_numerico'] = parse_currency(df[valor_col])
+    else:
+        df['valor_numerico'] = 0.0
+    
+    # Converter coluna de vencimento para data
+    vencimento_col = None
+    for col in df.columns:
+        if 'vencimento' in col.lower() or 'due' in col.lower():
+            vencimento_col = col
+            break
+    
+    if vencimento_col:
+        df['data_vencimento'] = pd.to_datetime(df[vencimento_col], errors='coerce', dayfirst=True)
+    else:
+        df['data_vencimento'] = pd.NaT
+    
+    # Calcular dias de atraso
+    hoje = datetime.now()
+    df['dias_atraso'] = (hoje - df['data_vencimento']).dt.days
+    
+    # Categorizar em faixas de atraso
+    def categorizar_atraso(dias):
+        if pd.isna(dias):
+            return 'Sem Data'
+        if dias <= 0:
+            return '0-30 dias'
+        elif dias <= 30:
+            return '0-30 dias'
+        elif dias <= 60:
+            return '31-60 dias'
+        elif dias <= 90:
+            return '61-90 dias'
+        else:
+            return '>90 dias'
+    
+    df['faixa_atraso'] = df['dias_atraso'].apply(categorizar_atraso)
+    
+    return df
 
 # --- FUNÇÃO PARA RENDERIZAR PÁGINA COMERCIAL ---
 def render_page_comercial(df):
@@ -362,14 +419,93 @@ def render_page_inadimplencia(df_contas_receber):
             st.rerun()
 
     st.title("📋 Resumo Inadimplência")
-    st.info("🔄 Página em desenvolvimento. Aguardando definição dos KPIs e análises de carteira.")
     
-    if df_contas_receber is not None and not df_contas_receber.empty:
-        st.subheader("📊 Base de Dados - Contas a Receber")
-        st.dataframe(df_contas_receber.head(10), use_container_width=True)
-        st.caption(f"Total de registros carregados: {len(df_contas_receber)}")
-    else:
+    if df_contas_receber is None or df_contas_receber.empty:
         st.warning("⚠️ Base de Contas a Receber não encontrada ou vazia.")
+        return
+    
+    # Processar dados de inadimplência
+    df = processar_contas_receber(df_contas_receber)
+    
+    # Calcular KPIs
+    total_aberto = df['valor_numerico'].sum()
+    clientes_inadimplentes = df['CPF/CNPJ'].nunique() if 'CPF/CNPJ' in df.columns else df.iloc[:, 1].nunique()
+    repasse_sittax = total_aberto * 0.30
+    
+    # KPIs
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Total em Aberto", f"R$ {int(total_aberto):,}".replace(",", "."))
+    c2.metric("Clientes Inadimplentes", int(clientes_inadimplentes))
+    c3.metric("Repasse Sittax (30%)", f"R$ {int(repasse_sittax):,}".replace(",", "."))
+    
+    st.divider()
+    
+    # Gráfico de Rosca - Aging
+    st.subheader("📊 Distribuição de Clientes por Faixa de Atraso")
+    col_rosca, col_info = st.columns([2, 1])
+    
+    with col_rosca:
+        aging_data = df[df['faixa_atraso'] != 'Sem Data'].groupby('faixa_atraso')['CPF/CNPJ'].nunique().reset_index()
+        aging_data.columns = ['Faixa', 'Quantidade']
+        
+        # Ordenar as faixas
+        ordem_faixas = ['0-30 dias', '31-60 dias', '61-90 dias', '>90 dias']
+        aging_data['Faixa'] = pd.Categorical(aging_data['Faixa'], categories=ordem_faixas, ordered=True)
+        aging_data = aging_data.sort_values('Faixa')
+        
+        # Calcular percentuais
+        total_clientes = aging_data['Quantidade'].sum()
+        aging_data['Percentual'] = (aging_data['Quantidade'] / total_clientes * 100).round(1)
+        aging_data['Label'] = aging_data['Faixa'] + '  
+' + aging_data['Percentual'].astype(str) + '%'
+        
+        fig = px.pie(aging_data, values='Quantidade', names='Label', title="Clientes por Faixa de Atraso", 
+                     hole=0.4, color_discrete_sequence=[COLOR_PRIMARY, COLOR_SECONDARY, '#FF6B6B', '#E74C3C'])
+        fig.update_layout(xaxis_title=None, yaxis_title=None)
+        st.plotly_chart(fig, use_container_width=True)
+    
+    st.divider()
+    
+    # Gráfico de Barras - Evolução por Mês
+    st.subheader("📈 Total em Aberto por Mês de Vencimento")
+    
+    df['mes_vencimento'] = df['data_vencimento'].dt.to_period('M')
+    evolucao_mes = df[df['data_vencimento'].notna()].groupby('mes_vencimento')['valor_numerico'].sum().reset_index()
+    evolucao_mes['mes_vencimento'] = evolucao_mes['mes_vencimento'].astype(str)
+    evolucao_mes = evolucao_mes.sort_values('mes_vencimento')
+    
+    fig = px.bar(evolucao_mes, x='mes_vencimento', y='valor_numerico', title="Evolução de Dívida por Mês", 
+                 color_discrete_sequence=[COLOR_PRIMARY], labels={'mes_vencimento': 'Mês', 'valor_numerico': 'Valor (R$)'})
+    fig.update_traces(texttemplate='R$ %{y:,.0f}', textposition='outside')
+    fig.update_layout(xaxis_title=None, yaxis_title=None, plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)')
+    st.plotly_chart(fig, use_container_width=True)
+    
+    st.divider()
+    
+    # Tabela de Contas a Receber (Colunas Selecionadas)
+    st.subheader("📋 Detalhamento de Contas a Receber")
+    
+    # Identificar colunas para exibição
+    colunas_exibicao = []
+    for col in df.columns:
+        col_lower = col.lower()
+        if any(x in col_lower for x in ['vencimento', 'cpf', 'cnpj', 'nome', 'descrição', 'valor', 'categoria', 'centro']):
+            colunas_exibicao.append(col)
+    
+    if not colunas_exibicao:
+        colunas_exibicao = df.columns[:5].tolist()
+    
+    df_exibicao = df[colunas_exibicao].copy()
+    st.dataframe(df_exibicao.sort_values(by=df_exibicao.columns[0], ascending=False), use_container_width=True)
+    
+    # Botão de Download da Base Completa
+    csv = df.to_csv(index=False)
+    st.download_button(
+        label="📥 Baixar Base Completa (CSV)",
+        data=csv,
+        file_name="contas_receber_completa.csv",
+        mime="text/csv"
+    )
 
 # --- MAIN APP ---
 df_processed, df_contas_receber = processar_dados()
