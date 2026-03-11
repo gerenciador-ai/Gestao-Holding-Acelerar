@@ -15,6 +15,10 @@ COLOR_TEXT = "#FFFFFF"      # Branco
 COLOR_BG = "#F0F2F6"        # Cinza Claro Fundo
 COLOR_CHURN = "#E74C3C"     # Vermelho para Perdas
 
+# Inicializar session_state para navegação
+if 'page' not in st.session_state:
+    st.session_state.page = 'comercial'
+
 # Função para carregar imagem local e converter para base64
 def get_base64_of_bin_file(bin_file):
     try:
@@ -100,6 +104,44 @@ st.markdown(f"""
     }}
     
     h1, h2, h3 {{ color: {COLOR_PRIMARY}; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }}
+    
+    /* BOTÕES DE NAVEGAÇÃO PREMIUM */
+    .nav-button {{
+        display: inline-block;
+        padding: 10px 20px;
+        margin: 5px;
+        border-radius: 8px;
+        font-weight: 600;
+        cursor: pointer;
+        border: none;
+        transition: all 0.3s ease;
+        font-size: 0.95rem;
+    }}
+    
+    .nav-button-active {{
+        background-color: {COLOR_PRIMARY};
+        color: {COLOR_TEXT};
+        box-shadow: 0 4px 8px rgba(11, 42, 78, 0.3);
+    }}
+    
+    .nav-button-inactive {{
+        background-color: {COLOR_SECONDARY};
+        color: {COLOR_PRIMARY};
+        box-shadow: 0 2px 4px rgba(137, 207, 240, 0.2);
+    }}
+    
+    .nav-button-inactive:hover {{
+        background-color: #7BB8E8;
+        transform: translateY(-2px);
+    }}
+    
+    .nav-container {{
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+    }}
     </style>
     """, unsafe_allow_html=True)
 
@@ -178,11 +220,8 @@ def processar_dados():
     
     return df, df_cr
 
-# --- UI ---
-df_processed, df_contas_receber = processar_dados()
-if df_processed is not None:
-    df = df_processed
-
+# --- FUNÇÃO PARA RENDERIZAR PÁGINA COMERCIAL ---
+def render_page_comercial(df, df_contas_receber):
     # Sidebar com Logotipo FIXO NO TOPO
     logo_base64 = get_base64_of_bin_file('/home/ubuntu/logo_acelerar_tech.png')
     if logo_base64:
@@ -223,6 +262,19 @@ if df_processed is not None:
     base_ativa = len(df[df['status'] == 'Confirmada']) - len(df[df['status'] == 'Cancelada'])
     churn_p = (mrr_perd / mrr_conq * 100) if mrr_conq > 0 else 0
 
+    # Botões de Navegação Premium (Topo Direito)
+    st.markdown("""
+        <div class="nav-container">
+            <button class="nav-button nav-button-active" style="cursor: default;">📊 Resumo Comercial</button>
+        </div>
+    """, unsafe_allow_html=True)
+    
+    col_nav_left, col_nav_right = st.columns([0.85, 0.15])
+    with col_nav_right:
+        if st.button("📋 Resumo Inadimplência", key="btn_inadimplencia", use_container_width=True):
+            st.session_state.page = 'inadimplencia'
+            st.rerun()
+
     st.title("📊 Dashboard Comercial Estratégico")
     
     # Linha 1 de KPIs (5 colunas) - Formatação sem decimais
@@ -262,7 +314,6 @@ if df_processed is not None:
     with col3:
         df_c_evol = df_ano[df_ano['status'] == 'Cancelada'].groupby(['mes_num','mes_nome']).agg({'mrr':'sum', 'cliente':'count'}).reset_index().sort_values('mes_num')
         df_c_evol = df_c_evol[df_c_evol['mrr'] > 0]
-        # Padronizado para Azul Marinho conforme solicitado
         fig = px.bar(df_c_evol, x='mes_nome', y='mrr', text='cliente', title="Evolução de Churn", color_discrete_sequence=[COLOR_PRIMARY])
         fig.update_traces(texttemplate='%{text}', textposition='inside')
         fig.update_layout(xaxis_title=None, yaxis_title=None, plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)')
@@ -316,60 +367,5 @@ if df_processed is not None:
     col_sdr1, col_sdr2 = st.columns(2)
 
     with col_sdr1:
-        df_rank_sdr_cont = df_f[df_f['status'] == 'Confirmada'].groupby('sdr')['cliente'].count().sort_values(ascending=True).reset_index()
-        df_rank_sdr_cont.columns = ['SDR', 'Contratos']
-        fig_sdr_cont = px.bar(df_rank_sdr_cont.tail(5), x='Contratos', y='SDR', orientation='h',
-                               title='Top 5 SDRs (Contratos)', text='Contratos',
-                               color_discrete_sequence=[COLOR_PRIMARY])
-        fig_sdr_cont.update_traces(textposition='inside', textfont_color='white')
-        fig_sdr_cont.update_layout(xaxis_title=None, yaxis_title=None, plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', height=300)
-        st.plotly_chart(fig_sdr_cont, use_container_width=True)
-
-    with col_sdr2:
-        df_rank_sdr_mrr = df_f[df_f['status'] == 'Confirmada'].groupby('sdr')['mrr'].sum().sort_values(ascending=True).reset_index()
-        df_rank_sdr_mrr.columns = ['SDR', 'MRR']
-        fig_sdr_mrr = px.bar(df_rank_sdr_mrr.tail(5), x='MRR', y='SDR', orientation='h',
-                         title='Top 5 SDRs (MRR)', text=df_rank_sdr_mrr.tail(5)['MRR'].apply(lambda x: f"R$ {int(x):,}"),
-                         color_discrete_sequence=[COLOR_SECONDARY])
-        fig_sdr_mrr.update_traces(textposition='inside', textfont_color=COLOR_PRIMARY)
-        fig_sdr_mrr.update_layout(xaxis_title=None, yaxis_title=None, plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', height=300)
-        st.plotly_chart(fig_sdr_mrr, use_container_width=True)
-
-    st.divider()
-
-    # --- RANKINGS DE VENDEDORES (SEM DECIMAIS) ---
-    st.subheader("🏆 Rankings de Vendedores")
-    col_rank1, col_rank2 = st.columns(2)
-
-    with col_rank1:
-        df_rank_contratos = df_f[df_f['status'] == 'Confirmada'].groupby('vendedor')['cliente'].count().sort_values(ascending=True).reset_index()
-        df_rank_contratos.columns = ['Vendedor', 'Contratos']
-        fig_contratos = px.bar(df_rank_contratos.tail(10), x='Contratos', y='Vendedor', orientation='h',
-                               title='Top Vendedores (Contratos)', text='Contratos',
-                               color_discrete_sequence=[COLOR_PRIMARY])
-        fig_contratos.update_traces(textposition='inside', textfont_color='white')
-        fig_contratos.update_layout(xaxis_title=None, yaxis_title=None, plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', height=400)
-        st.plotly_chart(fig_contratos, use_container_width=True)
-
-    with col_rank2:
-        df_rank_mrr = df_f[df_f['status'] == 'Confirmada'].groupby('vendedor')['mrr'].sum().sort_values(ascending=True).reset_index()
-        df_rank_mrr.columns = ['Vendedor', 'MRR']
-        fig_mrr = px.bar(df_rank_mrr.tail(10), x='MRR', y='Vendedor', orientation='h',
-                         title='Top Vendedores (MRR)', text=df_rank_mrr.tail(10)['MRR'].apply(lambda x: f"R$ {int(x):,}"),
-                         color_discrete_sequence=[COLOR_SECONDARY])
-        fig_mrr.update_traces(textposition='inside', textfont_color=COLOR_PRIMARY)
-        fig_mrr.update_layout(xaxis_title=None, yaxis_title=None, plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', height=400)
-        st.plotly_chart(fig_mrr, use_container_width=True)
-
-    st.divider()
-
-    st.subheader("📋 Detalhamento")
-    st.dataframe(df_f[['data', 'cliente', 'vendedor', 'sdr', 'produto', 'status', 'mrr', 'upgrade', 'adesao']].sort_values('data', ascending=False), use_container_width=True)
-
-    # Verificação silenciosa da nova planilha
-    if df_contas_receber is not None and not df_contas_receber.empty:
-        with st.expander("🔍 Verificação: Dados Contas a Receber"):
-            st.dataframe(df_contas_receber.head())
-
-else:
-    st.error("Nenhum dado válido encontrado para os filtros selecionados.")
+        df_rank_sdr_cont = df_f[df_f['st
+(Content truncated due to size limit. Use line ranges to read remaining content)
