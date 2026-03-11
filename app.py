@@ -16,6 +16,26 @@ COLOR_CHURN = "#E74C3C"
 if 'page' not in st.session_state:
     st.session_state.page = 'comercial'
 
+if 'empresa' not in st.session_state:
+    st.session_state.empresa = 'VMC Tech'
+
+EMPRESAS = {
+    'VMC Tech': {
+        'vendas_id': '1df7wNT1XQaiVK38vNdjbQudXkeH-lHTZWoYQ9gikZ0M',
+        'vendas_gid': '1202307787',
+        'cancelados_id': '1GDU6qVJ9Gf9C9lwHx2KwOiTltyeUPWhD_y3ODUczuTw',
+        'cancelados_gid': '606807719',
+        'contas_receber_id': '1Nqmn2c9p0QFu8LFIqFQ0EBxA8klHFUsVjAW15la-Fjg'
+    },
+    'Victec': {
+        'vendas_id': '1o0RJI58HW-NLX97Jab4YpKiM4b8_kIw2o11EL8iMgCo',
+        'vendas_gid': '0',
+        'cancelados_id': '1-eXWcie9mPwtWOiQDDiPlwrDmexvXeeQ4FAIDPEQ9c4',
+        'cancelados_gid': '0',
+        'contas_receber_id': '1Y28LP_ZPqWKMjXqf88ahzaDET_DneOYhxuNOmyinxus'
+    }
+}
+
 def get_base64_of_bin_file(bin_file):
     try:
         with open(bin_file, 'rb') as f:
@@ -63,7 +83,6 @@ st.markdown(f"""
     div[data-testid="column"]:nth-of-type(3) div[data-testid="stMetricDelta"] svg {{
         fill: {COLOR_CHURN} !important;
         stroke: {COLOR_CHURN} !important;
-        transform: rotate(180deg) !important;
     }}
     [data-testid="stSidebar"] {{
         background-color: {COLOR_PRIMARY} !important;
@@ -90,15 +109,9 @@ st.markdown(f"""
     </style>
     """, unsafe_allow_html=True)
 
-VENDAS_ID = "1df7wNT1XQaiVK38vNdjbQudXkeH-lHTZWoYQ9gikZ0M"
-VENDAS_GID = "1202307787"
-CANCELADOS_ID = "1GDU6qVJ9Gf9C9lwHx2KwOiTltyeUPWhD_y3ODUczuTw"
-CANCELADOS_GID = "606807719"
-CONTAS_RECEBER_ID = "1Nqmn2c9p0QFu8LFIqFQ0EBxA8klHFUsVjAW15la-Fjg"
-
 @st.cache_data(ttl=600)
 def load_data(sheet_id, gid=None):
-    if gid:
+    if gid and gid != '0':
         url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv&gid={gid}"
     else:
         url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv"
@@ -123,10 +136,11 @@ def parse_currency(series):
         except: return 0.0
     return series.apply(clean_val)
 
-def processar_dados():
-    df_v = load_data(VENDAS_ID, VENDAS_GID)
-    df_c = load_data(CANCELADOS_ID, CANCELADOS_GID)
-    df_cr = load_data(CONTAS_RECEBER_ID)
+def processar_dados(empresa):
+    config = EMPRESAS[empresa]
+    df_v = load_data(config['vendas_id'], config['vendas_gid'])
+    df_c = load_data(config['cancelados_id'], config['cancelados_gid'])
+    df_cr = load_data(config['contas_receber_id'])
 
     if df_v.empty: return None, None
 
@@ -172,6 +186,13 @@ def render_page_comercial(df):
             unsafe_allow_html=True
         )
     
+    st.sidebar.markdown("<h3 style='color: white; text-align: center;'>🏢 Seletor de Empresa</h3>", unsafe_allow_html=True)
+    empresa_sel = st.sidebar.selectbox("Selecione a Empresa", list(EMPRESAS.keys()), index=list(EMPRESAS.keys()).index(st.session_state.empresa))
+    if empresa_sel != st.session_state.empresa:
+        st.session_state.empresa = empresa_sel
+        st.cache_data.clear()
+        st.rerun()
+    
     st.sidebar.markdown("<h3 style='color: white; text-align: center;'>🔍 Filtros Estratégicos</h3>", unsafe_allow_html=True)
     
     anos = sorted(df['ano'].unique(), reverse=True)
@@ -209,12 +230,12 @@ def render_page_comercial(df):
             st.session_state.page = 'inadimplencia'
             st.rerun()
 
-    st.title("📊 Resumo Comercial")
+    st.title(f"📊 Resumo Comercial - {st.session_state.empresa}")
     
     c1, c2, c3, c4, c5 = st.columns(5)
     c1.metric("MRR Conquistado", f"R$ {int(mrr_conq):,}".replace(",", "."))
     c2.metric("MRR Ativo (Net)", f"R$ {int(mrr_conq - mrr_perd):,}".replace(",", "."))
-    c3.metric("MRR Perdido (Churn)", f"R$ {int(mrr_perd):,}".replace(",", "."), delta=f"{churn_p:.1f}%", delta_color="inverse")
+    c3.metric("MRR Perdido (Churn)", f"R$ {int(mrr_perd):,}".replace(",", "."), delta=f"{-churn_p:.1f}%", delta_color="inverse")
     c4.metric("Total de Upsell", f"R$ {int(upsell_v):,}".replace(",", "."), delta=f"{upsell_q} eventos", delta_color="normal")
     c5.metric("Ticket Médio", f"R$ {int(tkt_med):,}".replace(",", "."))
     
@@ -353,7 +374,7 @@ def render_page_inadimplencia(df_cr):
             st.session_state.page = 'comercial'
             st.rerun()
 
-    st.title("📋 Resumo Inadimplência")
+    st.title(f"📋 Resumo Inadimplência - {st.session_state.empresa}")
     
     if df_cr is None or df_cr.empty:
         st.warning("Base de Contas a Receber não encontrada ou vazia.")
@@ -476,7 +497,7 @@ def render_page_inadimplencia(df_cr):
         mime="text/csv"
     )
 
-df_processed, df_contas_receber = processar_dados()
+df_processed, df_contas_receber = processar_dados(st.session_state.empresa)
 
 if df_processed is not None:
     if st.session_state.page == 'comercial':
