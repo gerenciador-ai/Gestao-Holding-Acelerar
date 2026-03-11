@@ -14,6 +14,7 @@ COLOR_SECONDARY = "#89CFF0"
 COLOR_TEXT = "#FFFFFF"
 COLOR_BG = "#0A1E2E"
 COLOR_CHURN = "#E74C3C"
+COLOR_LOGIN_BG = "#0F2438"
 
 st.markdown(f"""
     <style>
@@ -26,6 +27,9 @@ st.markdown(f"""
         color: {COLOR_TEXT} !important;
         width: 100% !important;
         height: 100% !important;
+    }}
+    .login-page {{
+        background-color: {COLOR_LOGIN_BG} !important;
     }}
     [data-testid="stSidebar"] {{
         background-color: {COLOR_PRIMARY} !important;
@@ -189,23 +193,23 @@ def parse_currency(series):
     return series.apply(clean_val)
 
 def render_login():
+    st.markdown('<div class="login-page">', unsafe_allow_html=True)
+    
     img_base64 = get_base64_of_bin_file('Acelerar-Identidade-Visual.png')
     
     col1, col2, col3 = st.columns([1, 2, 1])
     
     with col2:
+        st.markdown("<div style='text-align: center; margin-top: 100px; margin-bottom: 40px;'>", unsafe_allow_html=True)
+        
         if img_base64:
             st.markdown(f"""
-                <div style="text-align: center; margin-bottom: 30px;">
-                    <img src="data:image/png;base64,{img_base64}" width="280" style="border-radius: 10px;">
+                <div style="text-align: center; margin-bottom: 40px;">
+                    <img src="data:image/png;base64,{img_base64}" width="300" style="border-radius: 10px;">
                 </div>
                 """, unsafe_allow_html=True)
         
-        st.markdown(f"""
-            <div style="text-align: center; margin-bottom: 40px;">
-                <h1 style="color: {COLOR_SECONDARY}; font-size: 2.2rem; font-weight: bold;">Dashboard Comercial</h1>
-            </div>
-            """, unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
         
         with st.form("form_login"):
             email = st.text_input("📧 E-mail", placeholder="seu.email@empresa.com", key="login_email")
@@ -233,6 +237,8 @@ def render_login():
                             st.session_state.email_usuario = email
                             st.success("Login realizado com sucesso!")
                             st.rerun()
+    
+    st.markdown('</div>', unsafe_allow_html=True)
 
 def processar_dados(empresa):
     config = EMPRESAS[empresa]
