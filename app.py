@@ -67,14 +67,14 @@ st.markdown(f"""
     }}
     /* Estilo para a pílula do Delta no Churn */
     div[data-testid="column"]:nth-of-type(3) div[data-testid="stMetricDelta"] > div {{
-        background-color: rgba(231, 76, 60, 0.2) !important; /* Fundo vermelho suave */
+        background-color: rgba(231, 76, 60, 0.2) !important;
         color: {COLOR_CHURN} !important;
         padding: 2px 8px !important;
         border-radius: 15px !important;
     }}
     div[data-testid="column"]:nth-of-type(3) div[data-testid="stMetricDelta"] svg {{
         fill: {COLOR_CHURN} !important;
-        transform: rotate(180deg) !important; /* Seta para baixo */
+        transform: rotate(180deg) !important;
     }}
 
     /* REFINAMENTO DA SIDEBAR (FILTROS) */
@@ -184,7 +184,7 @@ def processar_dados():
 
 # --- FUNÇÃO PARA RENDERIZAR PÁGINA COMERCIAL ---
 def render_page_comercial(df):
-    # Sidebar com Logotipo FIXO NO TOPO
+    # Sidebar com Logotipo
     logo_base64 = get_base64_of_bin_file('/home/ubuntu/logo_acelerar_tech.png')
     if logo_base64:
         st.sidebar.markdown(
@@ -224,7 +224,7 @@ def render_page_comercial(df):
     base_ativa = len(df[df['status'] == 'Confirmada']) - len(df[df['status'] == 'Cancelada'])
     churn_p = (mrr_perd / mrr_conq * 100) if mrr_conq > 0 else 0
 
-    # Botão de Navegação (Topo Direito)
+    # Botão de Navegação
     col_nav_left, col_nav_right = st.columns([0.8, 0.2])
     with col_nav_right:
         if st.button("📋 Resumo Inadimplência", use_container_width=True):
@@ -233,7 +233,7 @@ def render_page_comercial(df):
 
     st.title("📊 Resumo Comercial")
     
-    # Linha 1 de KPIs
+    # KPIs
     c1, c2, c3, c4, c5 = st.columns(5)
     c1.metric("MRR Conquistado", f"R$ {int(mrr_conq):,}".replace(",", "."))
     c2.metric("MRR Ativo (Net)", f"R$ {int(mrr_conq - mrr_perd):,}".replace(",", "."))
@@ -241,7 +241,6 @@ def render_page_comercial(df):
     c4.metric("Total de Upsell", f"R$ {int(upsell_v):,}".replace(",", "."), delta=f"{upsell_q} eventos", delta_color="normal")
     c5.metric("Ticket Médio", f"R$ {int(tkt_med):,}".replace(",", "."))
     
-    # Linha 2 de KPIs
     c6, c7, c8, c9 = st.columns(4)
     c6.metric("Adesão Total", f"R$ {int(df_f['adesao'].sum()):,}".replace(",", "."))
     c7.metric("Clientes fechado", cl_fech)
@@ -252,21 +251,18 @@ def render_page_comercial(df):
     
     st.subheader("📈 Evolução Mensal")
     col1, col2, col3 = st.columns(3)
-    
     with col1:
         df_m = df_ano[df_ano['status'] == 'Confirmada'].groupby(['mes_num','mes_nome']).agg({'mrr':'sum', 'cliente':'count'}).reset_index().sort_values('mes_num')
         fig = px.bar(df_m, x='mes_nome', y='mrr', text='cliente', title="MRR Conquistado", color_discrete_sequence=[COLOR_PRIMARY])
         fig.update_traces(texttemplate='%{text}', textposition='inside')
         fig.update_layout(xaxis_title=None, yaxis_title=None, plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)')
         st.plotly_chart(fig, use_container_width=True)
-    
     with col2:
         df_u = df_ano[df_ano['upgrade'] > 0].groupby(['mes_num','mes_nome']).agg({'upgrade':'sum', 'cliente':'count'}).reset_index().sort_values('mes_num')
         fig = px.bar(df_u, x='mes_nome', y='upgrade', text='cliente', title="Evolução de Upsell", color_discrete_sequence=[COLOR_SECONDARY])
         fig.update_traces(texttemplate='%{text}', textposition='inside')
         fig.update_layout(xaxis_title=None, yaxis_title=None, plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)')
         st.plotly_chart(fig, use_container_width=True)
-        
     with col3:
         df_c_evol = df_ano[df_ano['status'] == 'Cancelada'].groupby(['mes_num','mes_nome']).agg({'mrr':'sum', 'cliente':'count'}).reset_index().sort_values('mes_num')
         df_c_evol = df_c_evol[df_c_evol['mrr'] > 0]
@@ -279,21 +275,18 @@ def render_page_comercial(df):
     
     st.subheader("🎯 Performance vs. Metas")
     col4, col5 = st.columns(2)
-    
     df_meta = df_f[df_f['status'] == 'Confirmada'].groupby(['mes_num','mes_nome']).agg({'mrr':'sum', 'cliente':'count'}).reset_index().sort_values('mes_num')
     if not df_meta.empty:
         df_meta['mrr_a'] = df_meta['mrr'].cumsum()
         df_meta['cont_a'] = df_meta['cliente'].cumsum()
         df_meta['meta_m'] = [8000 * (i+1) for i in range(len(df_meta))]
         df_meta['meta_c'] = [17 * (i+1) for i in range(len(df_meta))]
-
         with col4:
             fig = go.Figure()
             fig.add_trace(go.Bar(x=df_meta['mes_nome'], y=df_meta['mrr_a'], name='Real', marker_color=COLOR_PRIMARY))
             fig.add_trace(go.Scatter(x=df_meta['mes_nome'], y=df_meta['meta_m'], name='Meta (8k/mês)', line=dict(color='#F1C40F', width=4)))
             fig.update_layout(title="MRR Acumulado vs. Meta", xaxis_title=None, yaxis_title=None, plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)')
             st.plotly_chart(fig, use_container_width=True)
-
         with col5:
             fig = go.Figure()
             fig.add_trace(go.Bar(x=df_meta['mes_nome'], y=df_meta['cont_a'], name='Real', marker_color=COLOR_SECONDARY))
@@ -310,7 +303,6 @@ def render_page_comercial(df):
         fig = go.Figure(go.Scatter(x=df_s['data_s'], y=df_s['mrr'], mode='lines+markers+text', text=df_s['mrr'].apply(lambda x: f"{int(x):,}"), textposition="top center", line=dict(color=COLOR_PRIMARY, width=4)))
         fig.update_layout(title="MRR SEMANA", xaxis_title=None, yaxis_title=None, showlegend=False, plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)')
         st.plotly_chart(fig, use_container_width=True)
-    
     with col7:
         fig = px.pie(df_f, names='produto', values='mrr', title="Receita por Produto", hole=0.4, color_discrete_sequence=[COLOR_PRIMARY, COLOR_SECONDARY, '#1A3A5A', '#2E5A88'])
         fig.update_layout(xaxis_title=None, yaxis_title=None)
@@ -318,26 +310,40 @@ def render_page_comercial(df):
 
     st.divider()
 
-    # --- RANKINGS ---
-    st.subheader("🏆 Rankings")
-    col_rank1, col_rank2 = st.columns(2)
+    # --- RANKINGS DE SDRs (TOP 5) ---
+    st.subheader("🏆 Rankings de SDRs (Top 5)")
+    col_sdr1, col_sdr2 = st.columns(2)
+    with col_sdr1:
+        df_rank_sdr_cont = df_f[df_f['status'] == 'Confirmada'].groupby('sdr')['cliente'].count().sort_values(ascending=True).reset_index()
+        df_rank_sdr_cont.columns = ['SDR', 'Contratos']
+        fig_sdr_cont = px.bar(df_rank_sdr_cont.tail(5), x='Contratos', y='SDR', orientation='h', title='Top 5 SDRs (Contratos)', text='Contratos', color_discrete_sequence=[COLOR_PRIMARY])
+        fig_sdr_cont.update_traces(textposition='inside', textfont_color='white')
+        fig_sdr_cont.update_layout(xaxis_title=None, yaxis_title=None, plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', height=300)
+        st.plotly_chart(fig_sdr_cont, use_container_width=True)
+    with col_sdr2:
+        df_rank_sdr_mrr = df_f[df_f['status'] == 'Confirmada'].groupby('sdr')['mrr'].sum().sort_values(ascending=True).reset_index()
+        df_rank_sdr_mrr.columns = ['SDR', 'MRR']
+        fig_sdr_mrr = px.bar(df_rank_sdr_mrr.tail(5), x='MRR', y='SDR', orientation='h', title='Top 5 SDRs (MRR)', text=df_rank_sdr_mrr.tail(5)['MRR'].apply(lambda x: f"R$ {int(x):,}"), color_discrete_sequence=[COLOR_SECONDARY])
+        fig_sdr_mrr.update_traces(textposition='inside', textfont_color=COLOR_PRIMARY)
+        fig_sdr_mrr.update_layout(xaxis_title=None, yaxis_title=None, plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', height=300)
+        st.plotly_chart(fig_sdr_mrr, use_container_width=True)
 
+    st.divider()
+
+    # --- RANKINGS DE VENDEDORES ---
+    st.subheader("🏆 Rankings de Vendedores")
+    col_rank1, col_rank2 = st.columns(2)
     with col_rank1:
         df_rank_contratos = df_f[df_f['status'] == 'Confirmada'].groupby('vendedor')['cliente'].count().sort_values(ascending=True).reset_index()
         df_rank_contratos.columns = ['Vendedor', 'Contratos']
-        fig_contratos = px.bar(df_rank_contratos.tail(10), x='Contratos', y='Vendedor', orientation='h',
-                               title='Top Vendedores (Contratos)', text='Contratos',
-                               color_discrete_sequence=[COLOR_PRIMARY])
+        fig_contratos = px.bar(df_rank_contratos.tail(10), x='Contratos', y='Vendedor', orientation='h', title='Top Vendedores (Contratos)', text='Contratos', color_discrete_sequence=[COLOR_PRIMARY])
         fig_contratos.update_traces(textposition='inside', textfont_color='white')
         fig_contratos.update_layout(xaxis_title=None, yaxis_title=None, plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', height=400)
         st.plotly_chart(fig_contratos, use_container_width=True)
-
     with col_rank2:
         df_rank_mrr = df_f[df_f['status'] == 'Confirmada'].groupby('vendedor')['mrr'].sum().sort_values(ascending=True).reset_index()
         df_rank_mrr.columns = ['Vendedor', 'MRR']
-        fig_mrr = px.bar(df_rank_mrr.tail(10), x='MRR', y='Vendedor', orientation='h',
-                         title='Top Vendedores (MRR)', text=df_rank_mrr.tail(10)['MRR'].apply(lambda x: f"R$ {int(x):,}"),
-                         color_discrete_sequence=[COLOR_SECONDARY])
+        fig_mrr = px.bar(df_rank_mrr.tail(10), x='MRR', y='Vendedor', orientation='h', title='Top Vendedores (MRR)', text=df_rank_mrr.tail(10)['MRR'].apply(lambda x: f"R$ {int(x):,}"), color_discrete_sequence=[COLOR_SECONDARY])
         fig_mrr.update_traces(textposition='inside', textfont_color=COLOR_PRIMARY)
         fig_mrr.update_layout(xaxis_title=None, yaxis_title=None, plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', height=400)
         st.plotly_chart(fig_mrr, use_container_width=True)
@@ -349,7 +355,6 @@ def render_page_comercial(df):
 
 # --- FUNÇÃO PARA RENDERIZAR PÁGINA DE INADIMPLÊNCIA ---
 def render_page_inadimplencia(df_contas_receber):
-    # Botão de Navegação (Topo Direito)
     col_nav_left, col_nav_right = st.columns([0.8, 0.2])
     with col_nav_right:
         if st.button("📊 Resumo Comercial", use_container_width=True):
@@ -357,7 +362,6 @@ def render_page_inadimplencia(df_contas_receber):
             st.rerun()
 
     st.title("📋 Resumo Inadimplência")
-    
     st.info("🔄 Página em desenvolvimento. Aguardando definição dos KPIs e análises de carteira.")
     
     if df_contas_receber is not None and not df_contas_receber.empty:
@@ -369,7 +373,6 @@ def render_page_inadimplencia(df_contas_receber):
 
 # --- MAIN APP ---
 df_processed, df_contas_receber = processar_dados()
-
 if df_processed is not None:
     if st.session_state.page == 'comercial':
         render_page_comercial(df_processed)
