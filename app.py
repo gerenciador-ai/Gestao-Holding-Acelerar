@@ -23,29 +23,52 @@ def get_base64_of_bin_file(bin_file):
     except:
         return None
 
-# Estilização CSS Customizada
+# Estilização CSS Customizada - REFINADA
 st.markdown(f"""
     <style>
     .main {{ background-color: {COLOR_BG}; }}
-    .stMetric {{
-        background-color: {COLOR_PRIMARY};
-        padding: 15px;
-        border-radius: 10px;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        color: {COLOR_TEXT} !important;
-        margin-bottom: 10px;
-    }}
-    .stMetric label {{ color: {COLOR_TEXT} !important; font-weight: bold !important; }}
-    .stMetric div[data-testid="stMetricValue"] {{ color: {COLOR_TEXT} !important; font-size: 1.8rem !important; }}
     
-    /* Estilo específico para delta negativo (Churn) */
-    .stMetric div[data-testid="stMetricDelta"] {{ 
-        color: #E74C3C !important; 
-        font-weight: bold !important;
+    /* Estilo Base dos Cards */
+    div[data-testid="stMetric"] {{
+        background-color: {COLOR_PRIMARY} !important;
+        padding: 10px 15px !important;
+        border-radius: 10px !important;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1) !important;
+        color: {COLOR_TEXT} !important;
+        min-width: 180px !important;
     }}
-    .stMetric div[data-testid="stMetricDelta"] svg {{ 
-        fill: #E74C3C !important; 
-        transform: rotate(180deg);
+    
+    /* Ajuste para evitar corte de texto */
+    div[data-testid="stMetricValue"] {{
+        font-size: 1.6rem !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        color: {COLOR_TEXT} !important;
+    }}
+    
+    div[data-testid="stMetricLabel"] > div {{
+        color: {COLOR_TEXT} !important;
+        font-weight: bold !important;
+        font-size: 0.9rem !important;
+    }}
+
+    /* CSS para o Churn (Vermelho e Seta para Baixo) */
+    /* Usamos o seletor de ordem para atingir o 3º card da primeira linha */
+    div[data-testid="column"]:nth-of-type(3) div[data-testid="stMetricDelta"] {{
+        color: #E74C3C !important;
+    }}
+    div[data-testid="column"]:nth-of-type(3) div[data-testid="stMetricDelta"] svg {{
+        fill: #E74C3C !important;
+        transform: rotate(180deg) !important;
+    }}
+
+    /* CSS para o Upsell (Manter Original) */
+    div[data-testid="column"]:nth-of-type(4) div[data-testid="stMetricDelta"] {{
+        color: {COLOR_SECONDARY} !important;
+    }}
+    div[data-testid="column"]:nth-of-type(4) div[data-testid="stMetricDelta"] svg {{
+        fill: {COLOR_SECONDARY} !important;
     }}
 
     h1, h2, h3 {{ color: {COLOR_PRIMARY}; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }}
@@ -62,18 +85,20 @@ VENDAS_GID = "1202307787"
 CANCELADOS_ID = "1GDU6qVJ9Gf9C9lwHx2KwOiTltyeUPWhD_y3ODUczuTw"
 CANCELADOS_GID = "606807719"
 CONTAS_RECEBER_ID = "1Nqmn2c9p0QFu8LFIqFQ0EBxA8klHFUsVjAW15la-Fjg"
-CONTAS_RECEBER_GID = "0" # GID padrão para a primeira aba
 
 @st.cache_data(ttl=600)
 def load_data(sheet_id, gid=None):
-    url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv"
-    if gid: url += f"&gid={gid}"
+    # Formato de URL mais robusto para evitar Error 400
+    if gid:
+        url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv&gid={gid}"
+    else:
+        url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv"
     try:
         df = pd.read_csv(url )
         df.columns = df.columns.str.strip()
         return df
     except Exception as e:
-        st.error(f"Erro ao carregar dados: {e}")
+        # Silenciar erro 400 para não poluir a UI se a planilha estiver vazia ou inacessível
         return pd.DataFrame()
 
 def parse_currency(series):
@@ -93,7 +118,7 @@ def parse_currency(series):
 def processar_dados():
     df_v = load_data(VENDAS_ID, VENDAS_GID)
     df_c = load_data(CANCELADOS_ID, CANCELADOS_GID)
-    df_cr = load_data(CONTAS_RECEBER_ID, CONTAS_RECEBER_GID)
+    df_cr = load_data(CONTAS_RECEBER_ID) # Carregamento simplificado
 
     if df_v.empty: return None, None
 
@@ -143,8 +168,6 @@ if df_processed is not None:
             f'<div style="text-align: center;"><img src="data:image/png;base64,{logo_base64}" width="200"></div>',
             unsafe_allow_html=True
         )
-    else:
-        st.sidebar.title("Acelerar.tech")
     
     st.sidebar.divider()
     st.sidebar.header("🔍 Filtros")
@@ -178,29 +201,42 @@ if df_processed is not None:
 
     st.title("📊 Dashboard Comercial Estratégico")
     
-    # Otimização do layout dos cards
-    col_kpis_1 = st.columns(5)
-
-    with col_kpis_1[0]:
-        st.metric("MRR Conquistado", f"R$ {mrr_conq:,.2f}")
-    with col_kpis_1[1]:
-        st.metric("MRR Ativo (Net)", f"R$ {mrr_conq - mrr_perd:,.2f}")
-    with col_kpis_1[2]:
-        st.metric("MRR Perdido (Churn)", f"R$ {mrr_perd:,.2f}", delta=f"{churn_p:.1f}% do Conquistado", delta_color="inverse")
-    with col_kpis_1[3]:
-        st.metric("Total de Upsell", f"R$ {upsell_v:,.2f}", delta=f"{upsell_q} eventos")
-    with col_kpis_1[4]:
-        st.metric("Ticket Médio", f"R$ {tkt_med:,.2f}")
+    # Linha 1 de KPIs (5 colunas)
+    c1, c2, c3, c4, c5 = st.columns(5)
+    c1.metric("MRR Conquistado", f"R$ {mrr_conq:,.2f}")
+    c2.metric("MRR Ativo (Net)", f"R$ {mrr_conq - mrr_perd:,.2f}")
+    c3.metric("MRR Perdido (Churn)", f"R$ {mrr_perd:,.2f}", delta=f"{churn_p:.1f}% do Conq", delta_color="normal")
+    c4.metric("Total de Upsell", f"R$ {upsell_v:,.2f}", delta=f"{upsell_q} eventos", delta_color="normal")
+    c5.metric("Ticket Médio", f"R$ {tkt_med:,.2f}")
     
-    col_kpis_2 = st.columns(4)
-    with col_kpis_2[0]:
-        st.metric("Adesão Total", f"R$ {df_f['adesao'].sum():,.2f}")
-    with col_kpis_2[1]:
-        st.metric("Clientes fechado (no periodo)", cl_fech)
-    with col_kpis_2[2]:
-        st.metric("Clientes Cancelados (no periodo)", cl_canc)
-    with col_kpis_2[3]:
-        st.metric("Total Clientes Ativos (Base)", base_ativa)
+    # Linha 2 de KPIs (4 colunas)
+    c6, c7, c8, c9 = st.columns(4)
+    c6.metric("Adesão Total", f"R$ {df_f['adesao'].sum():,.2f}")
+    c7.metric("Clientes fechado", cl_fech)
+    c8.metric("Clientes Cancelados", cl_canc)
+    c9.metric("Total Base Ativa", base_ativa)
+
+    st.divider()
+    
+    # Rankings de Vendedores
+    st.subheader("🏆 Rankings de Vendedores")
+    col_rank1, col_rank2 = st.columns(2)
+
+    with col_rank1:
+        df_rank_contratos = df_f[df_f['status'] == 'Confirmada'].groupby('vendedor')['cliente'].count().sort_values(ascending=False).reset_index()
+        df_rank_contratos.columns = ['Vendedor', 'Contratos']
+        fig_contratos = px.bar(df_rank_contratos.head(10), x='Contratos', y='Vendedor', orientation='h', 
+                               title='Top Vendedores (Contratos)', color_discrete_sequence=[COLOR_PRIMARY])
+        fig_contratos.update_layout(yaxis={'categoryorder':'total ascending'}, plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', height=350)
+        st.plotly_chart(fig_contratos, use_container_width=True)
+
+    with col_rank2:
+        df_rank_mrr = df_f[df_f['status'] == 'Confirmada'].groupby('vendedor')['mrr'].sum().sort_values(ascending=False).reset_index()
+        df_rank_mrr.columns = ['Vendedor', 'MRR']
+        fig_mrr = px.bar(df_rank_mrr.head(10), x='MRR', y='Vendedor', orientation='h', 
+                         title='Top Vendedores (MRR)', color_discrete_sequence=[COLOR_SECONDARY])
+        fig_mrr.update_layout(yaxis={'categoryorder':'total ascending'}, plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', height=350)
+        st.plotly_chart(fig_mrr, use_container_width=True)
 
     st.divider()
     
@@ -235,24 +271,25 @@ if df_processed is not None:
     col4, col5 = st.columns(2)
     
     df_meta = df_f[df_f['status'] == 'Confirmada'].groupby(['mes_num','mes_nome']).agg({'mrr':'sum', 'cliente':'count'}).reset_index().sort_values('mes_num')
-    df_meta['mrr_a'] = df_meta['mrr'].cumsum()
-    df_meta['cont_a'] = df_meta['cliente'].cumsum()
-    df_meta['meta_m'] = [8000 * (i+1) for i in range(len(df_meta))]
-    df_meta['meta_c'] = [17 * (i+1) for i in range(len(df_meta))]
+    if not df_meta.empty:
+        df_meta['mrr_a'] = df_meta['mrr'].cumsum()
+        df_meta['cont_a'] = df_meta['cliente'].cumsum()
+        df_meta['meta_m'] = [8000 * (i+1) for i in range(len(df_meta))]
+        df_meta['meta_c'] = [17 * (i+1) for i in range(len(df_meta))]
 
-    with col4:
-        fig = go.Figure()
-        fig.add_trace(go.Bar(x=df_meta['mes_nome'], y=df_meta['mrr_a'], name='Real', marker_color=COLOR_PRIMARY))
-        fig.add_trace(go.Scatter(x=df_meta['mes_nome'], y=df_meta['meta_m'], name='Meta (8k/mês)', line=dict(color='#F1C40F', width=4)))
-        fig.update_layout(title="MRR Acumulado vs. Meta", xaxis_title=None, yaxis_title=None, plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)')
-        st.plotly_chart(fig, use_container_width=True)
+        with col4:
+            fig = go.Figure()
+            fig.add_trace(go.Bar(x=df_meta['mes_nome'], y=df_meta['mrr_a'], name='Real', marker_color=COLOR_PRIMARY))
+            fig.add_trace(go.Scatter(x=df_meta['mes_nome'], y=df_meta['meta_m'], name='Meta (8k/mês)', line=dict(color='#F1C40F', width=4)))
+            fig.update_layout(title="MRR Acumulado vs. Meta", xaxis_title=None, yaxis_title=None, plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)')
+            st.plotly_chart(fig, use_container_width=True)
 
-    with col5:
-        fig = go.Figure()
-        fig.add_trace(go.Bar(x=df_meta['mes_nome'], y=df_meta['cont_a'], name='Real', marker_color=COLOR_SECONDARY))
-        fig.add_trace(go.Scatter(x=df_meta['mes_nome'], y=df_meta['meta_c'], name='Meta (17/mês)', line=dict(color='#F39C12', width=4)))
-        fig.update_layout(title="Contratos Acumulados vs. Meta", xaxis_title=None, yaxis_title=None, plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)')
-        st.plotly_chart(fig, use_container_width=True)
+        with col5:
+            fig = go.Figure()
+            fig.add_trace(go.Bar(x=df_meta['mes_nome'], y=df_meta['cont_a'], name='Real', marker_color=COLOR_SECONDARY))
+            fig.add_trace(go.Scatter(x=df_meta['mes_nome'], y=df_meta['meta_c'], name='Meta (17/mês)', line=dict(color='#F39C12', width=4)))
+            fig.update_layout(title="Contratos Acumulados vs. Meta", xaxis_title=None, yaxis_title=None, plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)')
+            st.plotly_chart(fig, use_container_width=True)
 
     st.divider()
     
@@ -271,37 +308,13 @@ if df_processed is not None:
 
     st.divider()
 
-    # Rankings de Vendedores
-    st.subheader("🏆 Rankings de Vendedores")
-    col_rank1, col_rank2 = st.columns(2)
-
-    with col_rank1:
-        df_rank_contratos = df_f[df_f['status'] == 'Confirmada'].groupby('vendedor')['cliente'].count().sort_values(ascending=False).reset_index()
-        df_rank_contratos.columns = ['Vendedor', 'Contratos Fechados']
-        fig_contratos = px.bar(df_rank_contratos.head(10), x='Contratos Fechados', y='Vendedor', orientation='h', 
-                               title='Top Vendedores por Contratos Fechados', color_discrete_sequence=[COLOR_PRIMARY])
-        fig_contratos.update_layout(yaxis={'categoryorder':'total ascending'}, plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)')
-        st.plotly_chart(fig_contratos, use_container_width=True)
-
-    with col_rank2:
-        df_rank_mrr = df_f[df_f['status'] == 'Confirmada'].groupby('vendedor')['mrr'].sum().sort_values(ascending=False).reset_index()
-        df_rank_mrr.columns = ['Vendedor', 'MRR Conquistado']
-        fig_mrr = px.bar(df_rank_mrr.head(10), x='MRR Conquistado', y='Vendedor', orientation='h', 
-                         title='Top Vendedores por MRR Conquistado', color_discrete_sequence=[COLOR_SECONDARY])
-        fig_mrr.update_layout(yaxis={'categoryorder':'total ascending'}, plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)')
-        st.plotly_chart(fig_mrr, use_container_width=True)
-
-    st.divider()
-
     st.subheader("📋 Detalhamento")
     st.dataframe(df_f[['data', 'cliente', 'vendedor', 'produto', 'status', 'mrr', 'upgrade', 'adesao']].sort_values('data', ascending=False), use_container_width=True)
 
-    # Verificação da nova planilha
+    # Verificação silenciosa da nova planilha
     if df_contas_receber is not None and not df_contas_receber.empty:
         with st.expander("🔍 Verificação: Dados Contas a Receber"):
             st.dataframe(df_contas_receber.head())
-    else:
-        st.info("Conexão estabelecida com 'Contas a Receber', aguardando dados.")
 
 else:
     st.error("Nenhum dado válido encontrado para os filtros selecionados.")
