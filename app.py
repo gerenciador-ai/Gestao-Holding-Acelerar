@@ -441,15 +441,15 @@ def render_page_inadimplencia(df_cr):
     
     st.subheader("📈 Total em Aberto por Mês de Vencimento")
     
-    df_cr_proc['mes_vencimento'] = df_cr_proc['data_vencimento'].dt.to_period('M')
-    evolucao_mes = df_cr_proc[df_cr_proc['data_vencimento'].notna()].groupby('mes_vencimento')['valor_numerico'].sum().reset_index()
-    evolucao_mes['mes_vencimento'] = evolucao_mes['mes_vencimento'].astype(str)
-    evolucao_mes = evolucao_mes.sort_values('mes_vencimento')
+    df_cr_proc['mes_ano_venc'] = df_cr_proc['data_vencimento'].dt.strftime('%m/%Y')
+    evolucao_mes = df_cr_proc[df_cr_proc['data_vencimento'].notna()].groupby('mes_ano_venc')['valor_numerico'].sum().reset_index()
+    evolucao_mes = evolucao_mes.sort_values('mes_ano_venc')
+    evolucao_mes.columns = ['Mês/Ano', 'Valor']
     
-    fig = px.bar(evolucao_mes, x='mes_vencimento', y='valor_numerico', title="Evolução de Dívida por Mês", 
-                 color_discrete_sequence=[COLOR_PRIMARY], labels={'mes_vencimento': 'Mês', 'valor_numerico': 'Valor (R$)'})
+    fig = px.bar(evolucao_mes, x='Mês/Ano', y='Valor', title="Total em Aberto por Mês de Vencimento", 
+                 color_discrete_sequence=[COLOR_PRIMARY], labels={'Valor': 'Valor (R$)'})
     fig.update_traces(texttemplate='R$ %{y:,.0f}', textposition='outside')
-    fig.update_layout(xaxis_title=None, yaxis_title=None, plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)')
+    fig.update_layout(xaxis_title=None, yaxis_title=None, plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', xaxis_tickangle=-45)
     st.plotly_chart(fig, use_container_width=True)
     
     st.divider()
