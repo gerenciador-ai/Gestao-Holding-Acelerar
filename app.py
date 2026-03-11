@@ -54,6 +54,9 @@ st.markdown(f"""
     div[data-testid="column"]:nth-of-type(3) div[data-testid="stMetricValue"] {{
         color: {COLOR_CHURN} !important;
     }}
+    div[data-testid="column"]:nth-of-type(3) div[data-testid="stMetricDelta"] {{
+        background-color: rgba(231, 76, 60, 0.2) !important;
+    }}
     div[data-testid="column"]:nth-of-type(3) div[data-testid="stMetricDelta"] > div {{
         background-color: rgba(231, 76, 60, 0.2) !important;
         color: {COLOR_CHURN} !important;
@@ -213,7 +216,7 @@ def render_page_comercial(df):
     c1, c2, c3, c4, c5 = st.columns(5)
     c1.metric("MRR Conquistado", f"R$ {int(mrr_conq):,}".replace(",", "."))
     c2.metric("MRR Ativo (Net)", f"R$ {int(mrr_conq - mrr_perd):,}".replace(",", "."))
-    c3.metric("MRR Perdido (Churn)", f"R$ {int(mrr_perd):,}".replace(",", "."), delta=f"{churn_p:.1f}% do Conq", delta_color="normal")
+    c3.metric("MRR Perdido (Churn)", f"R$ {int(mrr_perd):,}".replace(",", "."), delta=f"-{churn_p:.1f}% do Conq", delta_color="inverse")
     c4.metric("Total de Upsell", f"R$ {int(upsell_v):,}".replace(",", "."), delta=f"{upsell_q} eventos", delta_color="normal")
     c5.metric("Ticket Médio", f"R$ {int(tkt_med):,}".replace(",", "."))
     
