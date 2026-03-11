@@ -23,23 +23,25 @@ st.markdown(f"""
         padding: 0;
         box-sizing: border-box;
     }}
-    html, body {{
+    html, body, [data-testid="stAppViewContainer"] {{
         width: 100%;
         height: 100%;
         background-color: {COLOR_LOGIN_BG} !important;
     }}
-    [data-testid="stAppViewContainer"] {{
-        background-color: {COLOR_BG} !important;
-        color: {COLOR_TEXT} !important;
-    }}
     [data-testid="stMainBlockContainer"] {{
         background-color: {COLOR_BG} !important;
-    }}
-    .login-wrapper {{
         display: flex;
         justify-content: center;
         align-items: center;
         min-height: 100vh;
+    }}
+    .login-container {{
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        min-height: 100vh;
+        width: 100%;
         background-color: {COLOR_LOGIN_BG} !important;
         padding: 20px;
     }}
@@ -61,7 +63,10 @@ st.markdown(f"""
         margin-bottom: 30px;
         display: block;
     }}
-    .login-card input {{
+    .stForm {{
+        width: 100% !important;
+    }}
+    .stForm input {{
         background-color: #1a3a52 !important;
         color: {COLOR_TEXT} !important;
         border: 1px solid {COLOR_SECONDARY} !important;
@@ -69,11 +74,12 @@ st.markdown(f"""
         padding: 12px 15px !important;
         margin-bottom: 15px !important;
         font-size: 1rem !important;
+        width: 100% !important;
     }}
-    .login-card input::placeholder {{
+    .stForm input::placeholder {{
         color: rgba(255, 255, 255, 0.5) !important;
     }}
-    .login-card button {{
+    .stForm button {{
         background-color: {COLOR_SECONDARY} !important;
         color: {COLOR_PRIMARY} !important;
         border: none !important;
@@ -84,17 +90,16 @@ st.markdown(f"""
         cursor: pointer !important;
         width: 100% !important;
         margin-top: 10px !important;
+        transition: all 0.3s ease !important;
     }}
-    .login-card button:hover {{
+    .stForm button:hover {{
         background-color: #7ab8d6 !important;
-        transform: scale(1.02);
-        transition: all 0.3s ease;
+        transform: scale(1.02) !important;
     }}
     [data-testid="stSidebar"] {{
         background-color: {COLOR_PRIMARY} !important;
     }}
     [data-testid="stHeader"] {{
-        background-color: {COLOR_BG} !important;
         display: none !important;
     }}
     [data-testid="stToolbar"] {{
@@ -255,45 +260,46 @@ def render_login():
     img_base64 = get_base64_of_bin_file('Acelerar-Identidade-Visual.png')
     
     st.markdown(f"""
-        <div class="login-wrapper">
+        <div class="login-container">
             <div class="login-card">
                 {f'<img src="data:image/png;base64,{img_base64}" alt="Acelerar.tech">' if img_base64 else ''}
             </div>
         </div>
         """, unsafe_allow_html=True)
     
-    col1, col2, col3 = st.columns([1, 1.2, 1])
-    with col2:
-        st.markdown("<div style='margin-top: -150px;'>", unsafe_allow_html=True)
+    st.markdown(f"""
+        <div style="display: flex; justify-content: center; align-items: center; min-height: 100px; margin-top: -80px;">
+            <div style="width: 100%; max-width: 420px;">
+        """, unsafe_allow_html=True)
+    
+    with st.form("form_login"):
+        email = st.text_input("📧 E-mail", placeholder="seu.email@empresa.com", key="login_email")
+        senha = st.text_input("🔑 Senha", type="password", placeholder="Digite sua senha", key="login_senha")
         
-        with st.form("form_login"):
-            email = st.text_input("📧 E-mail", placeholder="seu.email@empresa.com", key="login_email")
-            senha = st.text_input("🔑 Senha", type="password", placeholder="Digite sua senha", key="login_senha")
-            
-            submit = st.form_submit_button("🚀 Entrar", use_container_width=True)
-            
-            if submit:
-                if not email or not senha:
-                    st.error("Por favor, preencha e-mail e senha.")
-                elif senha != SENHA_MESTRA:
-                    st.error("Senha incorreta.")
+        submit = st.form_submit_button("🚀 Entrar", use_container_width=True)
+        
+        if submit:
+            if not email or not senha:
+                st.error("Por favor, preencha e-mail e senha.")
+            elif senha != SENHA_MESTRA:
+                st.error("Senha incorreta.")
+            else:
+                df_usuarios = load_usuarios()
+                
+                if df_usuarios.empty:
+                    st.error("Erro ao carregar base de usuários.")
                 else:
-                    df_usuarios = load_usuarios()
+                    usuario = df_usuarios[df_usuarios['Email'].str.lower() == email.lower()]
                     
-                    if df_usuarios.empty:
-                        st.error("Erro ao carregar base de usuários.")
+                    if usuario.empty:
+                        st.error("E-mail não autorizado para acessar o dashboard.")
                     else:
-                        usuario = df_usuarios[df_usuarios['Email'].str.lower() == email.lower()]
-                        
-                        if usuario.empty:
-                            st.error("E-mail não autorizado para acessar o dashboard.")
-                        else:
-                            st.session_state.usuario_logado = True
-                            st.session_state.email_usuario = email
-                            st.success("Login realizado com sucesso!")
-                            st.rerun()
-        
-        st.markdown("</div>", unsafe_allow_html=True)
+                        st.session_state.usuario_logado = True
+                        st.session_state.email_usuario = email
+                        st.success("Login realizado com sucesso!")
+                        st.rerun()
+    
+    st.markdown("</div></div>", unsafe_allow_html=True)
 
 def processar_dados(empresa):
     config = EMPRESAS[empresa]
