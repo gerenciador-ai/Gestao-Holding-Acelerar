@@ -20,16 +20,20 @@ COLOR_TEXT = "#FFFFFF"
 COLOR_BG = "#0A1E2E"
 COLOR_CHURN = "#E74C3C"
 
-# --- IDs DO GOOGLE DRIVE (LOGOS) ---
-LOGOS = {
-    "ACELERAR_LOGIN": "1JuW0zxEWE_EQ8XgTeTIqtJCFBY2rlw4e",  # Acelerar_Opção2
-    "ACELERAR_SIDEBAR": "1bg9jbDLyeihNWaSA8E5fD65wO7euFRds", # Acelerar_Opção1
-    "VMC_TECH": "1QykO1QvIcgmC1_c3P-74N2LyKfreguyu",         # VMCTech_Opção1
-    "VICTEC": "1dxiBgVft09UB_L7Ai9c3G4yZwGVVRv86"            # Victec_Opção2
-}
+# --- LINKS DIRETOS DO GITHUB PARA OS LOGOS ---
+GITHUB_USER = "gerenciador-ai"
+GITHUB_REPO = "Relat-rios-Comercial"
+GITHUB_BRANCH = "main"
 
-def get_drive_url(file_id):
-    return f"https://drive.google.com/uc?export=download&id={file_id}"
+def get_github_url(filename):
+    return f"https://raw.githubusercontent.com/{GITHUB_USER}/{GITHUB_REPO}/{GITHUB_BRANCH}/{filename}"
+
+LOGOS = {
+    "ACELERAR_LOGIN": get_github_url("logo_acelerar_login.png"),
+    "ACELERAR_SIDEBAR": get_github_url("logo_acelerar_sidebar.png"),
+    "VMC_TECH": get_github_url("logo_vmctech.png"),
+    "VICTEC": get_github_url("logo_victec.png")
+}
 
 # Estilização CSS Customizada - VERSÃO EXECUTIVA DEFINITIVA
 st.markdown(f"""
@@ -128,7 +132,7 @@ st.markdown(f"""
         flex-direction: column;
         justify-content: center;
         align-items: center;
-        min-height: 50vh;
+        min-height: 45vh;
         background-color: transparent !important;
         margin-top: 5vh;
         text-align: center;
@@ -145,24 +149,20 @@ st.markdown(f"""
         color: {COLOR_TEXT};
         opacity: 0.9;
         font-size: 1.2rem;
-        margin-bottom: 25px;
-    }}
-
-    .login-logo {{
-        margin-bottom: 30px;
-    }}
-    
-    /* Estilo dos campos de input no login */
-    div[data-testid="stForm"] {{
-        border: none !important;
-        padding: 0 !important;
-        background-color: transparent !important;
+        margin-bottom: 20px;
     }}
 
     /* Ajuste de Padding para evitar rolagem */
     .block-container {{
         padding-top: 2rem !important;
         padding-bottom: 1rem !important;
+    }}
+
+    /* Estilo dos campos de input no login */
+    div[data-testid="stForm"] {{
+        border: none !important;
+        padding: 0 !important;
+        background-color: transparent !important;
     }}
     </style>
     """, unsafe_allow_html=True)
@@ -231,17 +231,17 @@ def parse_currency(series):
     return series.apply(clean_val)
 
 def render_login():
-    # RENDERIZAÇÃO COM LOGO ACELERAR E TÍTULO (CONFORME SOLICITADO)
+    # RENDERIZAÇÃO COM LOGO ACELERAR E TÍTULO (ENQUADRADO)
     st.markdown(f"""
         <div class="login-container">
             <p class="login-title">Dashboard Comercial</p>
         </div>
         """, unsafe_allow_html=True)
     
-    # Inserção do Logo da Acelerar centralizado
-    col_img1, col_img2, col_img3 = st.columns([1, 0.6, 1])
+    # Inserção do Logo da Acelerar centralizado e redimensionado
+    col_img1, col_img2, col_img3 = st.columns([1, 0.5, 1])
     with col_img2:
-        st.image(get_drive_url(LOGOS["ACELERAR_LOGIN"]), use_container_width=True)
+        st.image(LOGOS["ACELERAR_LOGIN"], use_container_width=True)
     
     st.markdown(f"""
         <div class="login-container" style="margin-top: 0; min-height: auto;">
@@ -301,8 +301,8 @@ else:
     
     # 2. RENDERIZAÇÃO DA SIDEBAR (GARANTIDA COM TODOS OS FILTROS)
     with st.sidebar:
-        # Logo Acelerar fixo no topo da sidebar
-        st.image(get_drive_url(LOGOS["ACELERAR_SIDEBAR"]), use_container_width=True)
+        # Logo Acelerar fixo no topo da sidebar e redimensionado
+        st.image(LOGOS["ACELERAR_SIDEBAR"], width=160)
         st.markdown(f"<h4 style='color: white;'>👤 Usuário: {st.session_state.email_usuario}</h4>", unsafe_allow_html=True)
         st.divider()
         
@@ -343,7 +343,7 @@ else:
             st.rerun()
 
     # Lógica de Logo Dinâmico da Unidade
-    logo_unidade_id = LOGOS["VMC_TECH"] if st.session_state.empresa == "VMC Tech" else LOGOS["VICTEC"]
+    logo_unidade_url = LOGOS["VMC_TECH"] if st.session_state.empresa == "VMC Tech" else LOGOS["VICTEC"]
 
     # 3. RENDERIZAÇÃO DAS PÁGINAS
     if df_p is not None:
@@ -361,8 +361,8 @@ else:
                     st.session_state.page = 'inadimplencia'
                     st.rerun()
 
-            # Logo da Unidade acima do título
-            st.image(get_drive_url(logo_unidade_id), width=150)
+            # Logo da Unidade redimensionado acima do título
+            st.image(logo_unidade_url, height=80)
             st.title(f"📊 Resumo Comercial - {st.session_state.empresa}")
             
             # KPIs
@@ -468,8 +468,8 @@ else:
                     st.session_state.page = 'comercial'
                     st.rerun()
             
-            # Logo da Unidade acima do título
-            st.image(get_drive_url(logo_unidade_id), width=150)
+            # Logo da Unidade redimensionado acima do título
+            st.image(logo_unidade_url, height=80)
             st.title(f"📋 Inadimplência - {st.session_state.empresa}")
             
             if df_cr.empty:
