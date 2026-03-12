@@ -630,6 +630,8 @@ def render_page_inadimplencia(df_cr):
         df_aging_cliente['Valor Total'] = df_aging_cliente['Valor Total'].apply(lambda x: f"R$ {int(x):,}".replace(",", "."))
         df_aging_cliente = df_aging_cliente[['Cliente', 'Mensalidades', 'Valor Total', 'Faixa de Atraso']]
         df_aging_cliente.columns = ['Cliente', 'Mensalidades em Aberto', 'Valor Total em Aberto', 'Dias em Atraso']
+
+        df_aging_cliente = df_aging_cliente.sort_values(by='Mensalidades em Aberto', ascending=False)
         
         st.dataframe(df_aging_cliente, use_container_width=True, hide_index=True)
     
