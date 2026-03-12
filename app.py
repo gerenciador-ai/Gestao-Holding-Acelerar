@@ -22,16 +22,16 @@ st.markdown(f"""
         padding: 0;
     }}
     html, body, [data-testid="stAppViewContainer"], [data-testid="stMainBlockContainer"] {{
-        background-color: {COLOR_BG} !important;
-        color: {COLOR_TEXT} !important;
+        background-color: #0A1E2E !important;
+        color: #FFFFFF !important;
         width: 100% !important;
         height: 100% !important;
     }}
     [data-testid="stSidebar"] {{
-        background-color: {COLOR_PRIMARY} !important;
+        background-color: #0B2A4E !important;
     }}
     [data-testid="stHeader"] {{
-        background-color: {COLOR_BG} !important;
+        background-color: #0A1E2E !important;
         display: none !important;
     }}
     [data-testid="stToolbar"] {{
@@ -50,7 +50,7 @@ st.markdown(f"""
         display: none !important;
     }}
     
-    /* CORREÇÃO DE TÍTULOS - ALTO CONTRASTE */
+    /* CORREÇÃO DE TÍTULOS - AZUL CLARO PARA ALTO CONTRASTE */
     h1, h2, h3, h4, h5, h6 {{
         color: {COLOR_SECONDARY} !important;
         font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif !important;
@@ -58,11 +58,11 @@ st.markdown(f"""
     }}
     
     div[data-testid="stMetric"] {{
-        background-color: {COLOR_PRIMARY} !important;
+        background-color: #0B2A4E !important;
         padding: 10px 15px !important;
         border-radius: 10px !important;
         box-shadow: 0 4px 6px rgba(0,0,0,0.3) !important;
-        color: {COLOR_TEXT} !important;
+        color: #FFFFFF !important;
         min-width: 180px !important;
     }}
     div[data-testid="stMetricValue"] {{
@@ -70,41 +70,41 @@ st.markdown(f"""
         white-space: nowrap !important;
         overflow: hidden !important;
         text-overflow: ellipsis !important;
-        color: {COLOR_TEXT} !important;
+        color: #FFFFFF !important;
     }}
     div[data-testid="stMetricLabel"] > div {{
-        color: {COLOR_TEXT} !important;
+        color: #FFFFFF !important;
         font-weight: bold !important;
         font-size: 0.9rem !important;
     }}
     div[data-testid="column"]:nth-of-type(3) div[data-testid="stMetric"] {{
-        border: 2px solid {COLOR_CHURN} !important;
+        border: 2px solid #E74C3C !important;
     }}
     div[data-testid="column"]:nth-of-type(3) div[data-testid="stMetricLabel"] > div,
     div[data-testid="column"]:nth-of-type(3) div[data-testid="stMetricValue"] {{
-        color: {COLOR_CHURN} !important;
+        color: #E74C3C !important;
     }}
     div[data-testid="column"]:nth-of-type(3) div[data-testid="stMetricDelta"] > div {{
         background-color: rgba(231, 76, 60, 0.2) !important;
-        color: {COLOR_CHURN} !important;
+        color: #E74C3C !important;
         padding: 2px 8px !important;
         border-radius: 15px !important;
     }}
     div[data-testid="column"]:nth-of-type(3) div[data-testid="stMetricDelta"] svg {{
-        fill: {COLOR_CHURN} !important;
-        stroke: {COLOR_CHURN} !important;
+        fill: #E74C3C !important;
+        stroke: #E74C3C !important;
     }}
     [data-testid="stSidebar"] .stMarkdown p, 
     [data-testid="stSidebar"] label, 
     [data-testid="stSidebar"] .stExpander p,
     [data-testid="stSidebar"] .stMultiSelect label {{
-        color: {COLOR_TEXT} !important;
+        color: #FFFFFF !important;
         font-weight: 600 !important;
     }}
     [data-testid="stSidebar"] .stSelectbox div[data-baseweb="select"],
     [data-testid="stSidebar"] .stMultiSelect div[data-baseweb="select"] {{
         background-color: #F8F9FA !important;
-        color: {COLOR_PRIMARY} !important;
+        color: #0B2A4E !important;
         border-radius: 5px !important;
     }}
     [data-testid="stSidebar"] .stExpander {{
@@ -125,7 +125,7 @@ st.markdown(f"""
         box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
         width: 100%;
         max-width: 400px;
-        border: 2px solid {COLOR_SECONDARY};
+        border: 2px solid #89CFF0;
     }}
     </style>
     """, unsafe_allow_html=True)
@@ -235,7 +235,6 @@ def processar_dados(empresa):
     df_c = load_data(config['cancelados_id'], config['cancelados_gid'])
     df_cr = load_data(config['contas_receber_id'])
     if df_v.empty: return None, None
-
     df = pd.DataFrame()
     df['vendedor'] = df_v['Vendedor'].fillna("N/A")
     df['sdr'] = df_v['SDR'].fillna("N/A")
@@ -276,15 +275,12 @@ def render_page_comercial(df):
     if prod_sel != "Todos": df_f = df_f[df_f['produto'] == prod_sel]
     if vend_sel != "Todos": df_f = df_f[df_f['vendedor'] == vend_sel]
     if sdr_sel != "Todos": df_f = df_f[df_f['sdr'] == sdr_sel]
-
     col_nav_left, col_nav_right = st.columns([1, 1])
     with col_nav_left:
         if st.button("📋 Resumo Inadimplência", use_container_width=True):
             st.session_state.page = 'inadimplencia'
             st.rerun()
-
     st.markdown(f"<h1 style='color: {COLOR_SECONDARY};'>📊 Resumo Comercial - {st.session_state.empresa}</h1>", unsafe_allow_html=True)
-    
     mrr_conq = df_f[df_f['status'] == "Confirmada"]['mrr'].sum()
     mrr_perd = df_f[df_f['status'] == "Cancelada"]['mrr'].sum()
     upsell_v = df_f['upgrade'].sum()
@@ -294,22 +290,18 @@ def render_page_comercial(df):
     tkt_med = mrr_conq / cl_fech if cl_fech > 0 else 0
     base_ativa = len(df[df['status'] == "Confirmada"]) - len(df[df['status'] == "Cancelada"])
     churn_p = (mrr_perd / mrr_conq * 100) if mrr_conq > 0 else 0
-
     c1, c2, c3 = st.columns(3)
     c1.metric("MRR Conquistado", f"R$ {int(mrr_conq):,}".replace(",", "."))
     c2.metric("MRR Ativo (Net)", f"R$ {int(mrr_conq - mrr_perd):,}".replace(",", "."))
     c3.metric("MRR Perdido (Churn)", f"R$ {int(mrr_perd):,}".replace(",", "."), delta=f"- {churn_p:.1f}%", delta_color="inverse")
-    
     c4, c5, c6 = st.columns(3)
     c4.metric("Total de Upsell", f"R$ {int(upsell_v):,}".replace(",", "."), delta=f"{upsell_q} eventos")
     c5.metric("Ticket Médio", f"R$ {int(tkt_med):,}".replace(",", "."))
     c6.metric("Adesão Total", f"R$ {int(df_f['adesao'].sum()):,}".replace(",", "."))
-    
     c7, c8, c9 = st.columns(3)
     c7.metric("Clientes fechado (no periodo)", cl_fech)
     c8.metric("Clientes Cancelados (no periodo)", cl_canc)
     c9.metric("Total Clientes Ativos (Base)", base_ativa)
-
     st.divider()
     st.markdown(f"<h2 style='color: {COLOR_SECONDARY};'>📈 Evolução Mensal</h2>", unsafe_allow_html=True)
     col1, col2, col3 = st.columns(3)
@@ -332,7 +324,6 @@ def render_page_comercial(df):
         fig.update_traces(texttemplate="%{text}", textposition="inside")
         fig.update_layout(xaxis_title=None, yaxis_title=None, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font_color=COLOR_TEXT)
         st.plotly_chart(fig, use_container_width=True)
-
     st.divider()
     st.markdown(f"<h2 style='color: {COLOR_SECONDARY};'>🎯 Performance vs. Metas</h2>", unsafe_allow_html=True)
     col4, col5 = st.columns(2)
@@ -353,7 +344,6 @@ def render_page_comercial(df):
         fig.add_trace(go.Scatter(x=df_meta["mes_nome"], y=df_meta["meta_c"], name="Meta (17/mês)", line=dict(color=COLOR_TEXT, width=4)))
         fig.update_layout(title="Contratos Acumulados vs. Meta", xaxis_title=None, yaxis_title=None, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font_color=COLOR_TEXT)
         st.plotly_chart(fig, use_container_width=True)
-
     st.divider()
     col6, col7 = st.columns(2)
     with col6:
@@ -366,7 +356,6 @@ def render_page_comercial(df):
         fig = px.pie(df_f, names="produto", values="mrr", title="Receita por Produto", hole=0.4, color_discrete_sequence=[COLOR_PRIMARY, COLOR_SECONDARY, "#FFFFFF", "#FFC107"])
         fig.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font_color=COLOR_TEXT)
         st.plotly_chart(fig, use_container_width=True)
-
     st.divider()
     st.markdown(f"<h2 style='color: {COLOR_SECONDARY};'>🏆 Ranking de Vendedores</h2>", unsafe_allow_html=True)
     col8, col9 = st.columns(2)
@@ -384,7 +373,6 @@ def render_page_comercial(df):
 R$ %{value:,.2f}")
         fig.update_layout(showlegend=False, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font_color=COLOR_TEXT)
         st.plotly_chart(fig, use_container_width=True)
-
     st.divider()
     st.markdown(f"<h2 style='color: {COLOR_SECONDARY};'>📋 Detalhamento</h2>", unsafe_allow_html=True)
     st.dataframe(df_f[["data", "cliente", "vendedor", "produto", "status", "mrr", "upgrade", "adesao"]].sort_values("data", ascending=False), use_container_width=True, hide_index=True)
@@ -395,40 +383,33 @@ def render_page_inadimplencia(df_cr):
         if st.button("📊 Resumo Comercial", use_container_width=True):
             st.session_state.page = 'comercial'
             st.rerun()
-
     st.markdown(f"<h1 style='color: {COLOR_SECONDARY};'>📋 Resumo Inadimplência - {st.session_state.empresa}</h1>", unsafe_allow_html=True)
     if df_cr is None or df_cr.empty:
         st.warning("Base de Contas a Receber não encontrada ou vazia.")
         return
-    
     df_cr_proc = df_cr.copy()
     df_cr_proc.columns = df_cr_proc.columns.str.strip()
     valor_col = next((c for c in df_cr_proc.columns if 'valor' in c.lower()), None)
     venc_col = next((c for c in df_cr_proc.columns if 'vencimento' in c.lower()), None)
     cpf_col = next((c for c in df_cr_proc.columns if 'cpf' in c.lower() or 'cnpj' in c.lower()), None)
     nome_col = next((c for c in df_cr_proc.columns if 'nome' in c.lower() and 'cliente' in c.lower()), next((c for c in df_cr_proc.columns if 'nome' in c.lower()), None))
-    
     df_cr_proc['valor_numerico'] = parse_currency(df_cr_proc[valor_col]) if valor_col else 0.0
     df_cr_proc['data_vencimento'] = pd.to_datetime(df_cr_proc[venc_col], errors='coerce', dayfirst=True) if venc_col else pd.NaT
     df_cr_proc['dias_atraso'] = (datetime.now() - df_cr_proc['data_vencimento']).dt.days
-    
     def categorizar_atraso(dias):
         if pd.isna(dias): return 'Sem Data'
         elif dias <= 30: return '0-30 dias'
         elif dias <= 60: return '31-60 dias'
         elif dias <= 90: return '61-90 dias'
         else: return '>90 dias'
-    
     df_cr_proc['faixa_atraso'] = df_cr_proc['dias_atraso'].apply(categorizar_atraso)
     total_aberto = df_cr_proc['valor_numerico'].sum()
     clientes_inadimplentes = df_cr_proc[cpf_col].nunique() if cpf_col else len(df_cr_proc)
     repasse_sittax = total_aberto * 0.30
-    
     c1, c2, c3 = st.columns(3)
     c1.metric("Total em Aberto", f"R$ {int(total_aberto):,}".replace(",", "."))
     c2.metric("Clientes Inadimplentes", int(clientes_inadimplentes))
     c3.metric("Repasse Sittax (30%)", f"R$ {int(repasse_sittax):,}".replace(",", "."))
-    
     st.divider()
     st.markdown(f"<h2 style='color: {COLOR_SECONDARY};'>📊 Distribuição de Clientes por Faixa de Atraso</h2>", unsafe_allow_html=True)
     col_rosca, col_tabela = st.columns([1.2, 1.8])
@@ -445,7 +426,6 @@ def render_page_inadimplencia(df_cr):
         df_aging_cliente = df_cr_proc[df_cr_proc['faixa_atraso'] != 'Sem Data'].groupby(nome_col if nome_col else (cpf_col if cpf_col else df_cr_proc.columns[0])).agg({'valor_numerico': 'sum', 'data_vencimento': 'count'}).reset_index()
         df_aging_cliente.columns = ['Cliente', 'Valor Total', 'Mensalidades']
         st.dataframe(df_aging_cliente, use_container_width=True, hide_index=True)
-
     st.divider()
     st.markdown(f"<h2 style='color: {COLOR_SECONDARY};'>📈 Total em Aberto por Mês de Vencimento</h2>", unsafe_allow_html=True)
     df_cr_proc['mes_ano_venc'] = df_cr_proc['data_vencimento'].dt.strftime('%m/%Y')
@@ -453,12 +433,10 @@ def render_page_inadimplencia(df_cr):
     fig = px.bar(evolucao_mes, x='mes_ano_venc', y='valor_numerico', color_discrete_sequence=[COLOR_SECONDARY])
     fig.update_layout(xaxis_title=None, yaxis_title=None, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font_color=COLOR_TEXT)
     st.plotly_chart(fig, use_container_width=True)
-
     st.divider()
     st.markdown(f"<h2 style='color: {COLOR_SECONDARY};'>📋 Detalhamento de Contas a Receber</h2>", unsafe_allow_html=True)
     st.dataframe(df_cr_proc[[venc_col, cpf_col, nome_col, valor_col]].dropna(how='all', axis=1), use_container_width=True)
 
-# Main Loop
 if not st.session_state.usuario_logado:
     render_login()
 else:
