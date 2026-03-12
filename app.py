@@ -639,10 +639,10 @@ def render_page_inadimplencia(df_cr):
     
     st.subheader("📈 Total em Aberto por Mês de Vencimento")
     
-    df_cr_proc['mes_ano_venc'] = df_cr_proc['data_vencimento'].dt.strftime('%m/%Y')
-    evolucao_mes = df_cr_proc[df_cr_proc['data_vencimento'].notna()].groupby('mes_ano_venc')['valor_numerico'].sum().reset_index()
-    evolucao_mes = evolucao_mes.sort_values('mes_ano_venc')
-    evolucao_mes.columns = ['Mês/Ano', 'Valor']
+    evolucao_mes = df_cr_proc[df_cr_proc['data_vencimento'].notna()].groupby(df_cr_proc['data_vencimento'].dt.to_period('M'))['valor_numerico'].sum().reset_index()
+    evolucao_mes.columns = ['Mês/Ano_Periodo', 'Valor']
+    evolucao_mes = evolucao_mes.sort_values('Mês/Ano_Periodo')
+    evolucao_mes['Mês/Ano'] = evolucao_mes['Mês/Ano_Periodo'].dt.strftime('%m/%Y')
     
     fig = px.bar(evolucao_mes, x='Mês/Ano', y='Valor', title="Total em Aberto por Mês de Vencimento", 
                  color_discrete_sequence=[COLOR_PRIMARY], labels={'Valor': 'Valor (R$)'})
