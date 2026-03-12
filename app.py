@@ -20,13 +20,13 @@ COLOR_TEXT = "#FFFFFF"
 COLOR_BG = "#0A1E2E"
 COLOR_CHURN = "#E74C3C"
 
-# Estilização CSS Customizada - VERSÃO EXECUTIVA V4 (CORREÇÃO DE LAYOUT FLUIDO)
+# Estilização CSS Customizada - VERSÃO EXECUTIVA DEFINITIVA
 st.markdown(f"""
     <style>
     /* Fundo Principal */
     .main {{ background-color: {COLOR_BG}; }}
     
-    /* Correção de Layout: Garantir que a tela expanda quando a sidebar recolher */
+    /* Layout Fluido da Sidebar */
     [data-testid="stSidebar"] {{
         background-color: {COLOR_PRIMARY} !important;
     }}
@@ -111,23 +111,22 @@ st.markdown(f"""
     footer {{ display: none !important; }}
     [data-testid="stDecoration"] {{ display: none !important; }}
     
-    /* Login Styles - SEM IMAGEM */
+    /* Login Styles - LIMPEZA RADICAL (SEM QUADRADO/CARD) */
     .login-container {{
         display: flex;
+        flex-direction: column;
         justify-content: center;
         align-items: center;
-        min-height: 100vh;
-        background-color: #0F2438 !important;
+        min-height: 40vh;
+        background-color: transparent !important;
+        margin-top: 10vh;
     }}
-    .login-card {{
-        background-color: rgba(10, 30, 46, 0.95) !important;
-        padding: 40px;
-        border-radius: 15px;
-        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
-        width: 100%;
-        max-width: 400px;
-        border: 2px solid {COLOR_SECONDARY};
-        text-align: center;
+    
+    /* Estilo dos campos de input no login */
+    div[data-testid="stForm"] {{
+        border: none !important;
+        padding: 0 !important;
+        background-color: transparent !important;
     }}
     </style>
     """, unsafe_allow_html=True)
@@ -196,16 +195,15 @@ def parse_currency(series):
     return series.apply(clean_val)
 
 def render_login():
+    # RENDERIZAÇÃO LIMPA: APENAS TEXTO E CAMPOS (COMANDO 1)
     st.markdown(f"""
         <div class="login-container">
-            <div class="login-card">
-                <h1 style="color: {COLOR_SECONDARY}; font-size: 1.8rem; margin-bottom: 10px;">Dashboard Comercial</h1>
-                <p style="color: {COLOR_TEXT}; opacity: 0.8; margin-bottom: 30px;">Acelerar.tech - Holding</p>
-            </div>
+            <h1 style="color: {COLOR_SECONDARY}; font-size: 2.5rem; margin-bottom: 5px; text-align: center;">Dashboard Comercial</h1>
+            <p style="color: {COLOR_TEXT}; opacity: 0.9; font-size: 1.2rem; margin-bottom: 40px; text-align: center;">Acelerar.tech - Holding</p>
         </div>
         """, unsafe_allow_html=True)
     
-    col1, col2, col3 = st.columns([1, 2, 1])
+    col1, col2, col3 = st.columns([1, 1.5, 1])
     with col2:
         with st.form("form_login"):
             email = st.text_input("📧 E-mail", placeholder="seu.email@empresa.com")
@@ -410,7 +408,7 @@ else:
             st.dataframe(df_f[['data', 'cliente', 'vendedor', 'sdr', 'produto', 'status', 'mrr', 'upgrade', 'adesao']].sort_values('data', ascending=False), use_container_width=True)
         
         else:
-            # PÁGINA DE INADIMPLÊNCIA
+            # PÁGINA DE INADIMPLÊNCIA (RESTAURAÇÃO COMPLETA - COMANDO 2)
             col_nav_left, col_nav_right = st.columns([0.8, 0.2])
             with col_nav_right:
                 if st.button("📊 Comercial", use_container_width=True):
@@ -465,12 +463,17 @@ else:
                     fig.update_layout(font=dict(color='white'), plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)')
                     st.plotly_chart(fig, use_container_width=True)
                 with col_tabela:
+                    # RESTAURAÇÃO DO TÍTULO E COLUNAS DA TABELA (COMANDO 2)
+                    st.markdown("### 📋 Resumo por Cliente")
                     df_aging_cliente = df_cr_proc[df_cr_proc['faixa_atraso'] != 'Sem Data'].groupby(nome_col if nome_col else (cpf_col if cpf_col else df_cr_proc.columns[0])).agg({'valor_numerico': 'sum', 'data_vencimento': 'count'}).reset_index()
                     df_aging_cliente.columns = ['Cliente', 'Valor Total', 'Mensalidades']
+                    # Adicionando coluna de Faixa na tabela de resumo
+                    df_aging_cliente['Faixa de Atraso'] = df_aging_cliente['Mensalidades'].apply(lambda x: '0-30 dias' if x==1 else ('31-60 dias' if x==2 else ('61-90 dias' if x==3 else '>90 dias')))
                     st.dataframe(df_aging_cliente.sort_values(by='Mensalidades', ascending=False), use_container_width=True, hide_index=True)
                 
                 st.divider()
-                st.subheader("📋 Detalhamento")
-                st.dataframe(df_cr_proc[[venc_col, cpf_col, nome_col, valor_col]].head(100), use_container_width=True)
+                # RESTAURAÇÃO DA TABELA DE DETALHAMENTO COMPLETA
+                st.subheader("📋 Detalhamento de Títulos")
+                st.dataframe(df_cr_proc[[venc_col, cpf_col, nome_col, valor_col, 'faixa_atraso']].sort_values(by=venc_col), use_container_width=True)
     else:
         st.error("Erro ao carregar os dados das planilhas.")
