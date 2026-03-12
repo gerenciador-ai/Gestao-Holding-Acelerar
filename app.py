@@ -29,13 +29,13 @@ def get_github_url(filename):
     return f"https://raw.githubusercontent.com/{GITHUB_USER}/{GITHUB_REPO}/{GITHUB_BRANCH}/{filename}"
 
 LOGOS = {
-    "ACELERAR_LOGIN": get_github_url("logo_acelerar_login.png"),
+    "ACELERAR_LOGIN": get_github_url("logo_acelerar_sidebar.png"), # Usando sidebar.png no login como solicitado
     "ACELERAR_SIDEBAR": get_github_url("logo_acelerar_sidebar.png"),
     "VMC_TECH": get_github_url("logo_vmctech.png"),
     "VICTEC": get_github_url("logo_victec.png")
 }
 
-# Estilização CSS Customizada - VERSÃO EXECUTIVA DEFINITIVA
+# Estilização CSS Customizada - VERSÃO WHITE LABEL (LIMPEZA TOTAL)
 st.markdown(f"""
     <style>
     /* Fundo Principal */
@@ -121,48 +121,44 @@ st.markdown(f"""
         font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif !important;
     }}
     
-    /* White Label - Limpeza de UI */
-    header[data-testid="stHeader"] {{ background: transparent !important; }}
+    /* WHITE LABEL - BLOQUEIO DE MENUS GERCENCIAIS (REMOÇÃO DO GITHUB, SHARE, ETC) */
+    header[data-testid="stHeader"] {{ background: transparent !important; display: none !important; }}
     footer {{ display: none !important; }}
     [data-testid="stDecoration"] {{ display: none !important; }}
+    [data-testid="stToolbar"] {{ display: none !important; }}
     
-    /* Login Styles - AJUSTE PARA ENQUADRAMENTO (SEM ROLAGEM) */
+    /* Esconder especificamente botões de Share, GitHub e Menu no topo */
+    button[title="View source on GitHub"], 
+    button[title="Share this app"], 
+    #MainMenu {{ display: none !important; }}
+    
+    /* Esconder rodapé "Gerenciar aplicativo" no Streamlit Cloud */
+    .viewerBadge_container__1QS1n, .viewerBadge_link__3S19W {{ display: none !important; }}
+    [data-testid="stStatusWidget"] {{ display: none !important; }}
+    
+    /* Login Styles - ESTÉTICA CLEAN (SEM TEXTOS, SÓ LOGO) */
     .login-container {{
         display: flex;
         flex-direction: column;
         justify-content: center;
         align-items: center;
-        min-height: 40vh;
+        min-height: 35vh;
         background-color: transparent !important;
-        margin-top: 5vh;
+        margin-top: 10vh;
         text-align: center;
     }}
     
-    .login-title {{
-        color: {COLOR_SECONDARY};
-        font-size: 2.8rem;
-        font-weight: bold;
-        margin-bottom: 5px;
-    }}
-    
-    .login-subtitle {{
-        color: {COLOR_TEXT};
-        opacity: 0.9;
-        font-size: 1.2rem;
-        margin-bottom: 20px;
-    }}
-
-    /* Ajuste de Padding para evitar rolagem */
-    .block-container {{
-        padding-top: 2rem !important;
-        padding-bottom: 1rem !important;
-    }}
-
     /* Estilo dos campos de input no login */
     div[data-testid="stForm"] {{
         border: none !important;
         padding: 0 !important;
         background-color: transparent !important;
+    }}
+
+    /* Ajuste de Padding para evitar rolagem */
+    .block-container {{
+        padding-top: 1rem !important;
+        padding-bottom: 1rem !important;
     }}
     </style>
     """, unsafe_allow_html=True)
@@ -231,25 +227,18 @@ def parse_currency(series):
     return series.apply(clean_val)
 
 def render_login():
-    # RENDERIZAÇÃO COM LOGO ACELERAR E TÍTULO (ENQUADRADO)
-    st.markdown(f"""
-        <div class="login-container">
-            <p class="login-title">Dashboard Comercial</p>
-        </div>
-        """, unsafe_allow_html=True)
+    # RENDERIZAÇÃO ESTÉTICA CLEAN: APENAS O LOGO CENTRALIZADO
+    st.markdown('<div class="login-container">', unsafe_allow_html=True)
     
-    # Inserção do Logo da Acelerar centralizado e redimensionado via width
-    col_img1, col_img2, col_img3 = st.columns([1, 0.5, 1])
+    # Inserção do Logo da Acelerar (Sidebar.png) centralizado e redimensionado
+    col_img1, col_img2, col_img3 = st.columns([1, 0.4, 1])
     with col_img2:
         st.image(LOGOS["ACELERAR_LOGIN"], use_container_width=True)
     
-    st.markdown(f"""
-        <div class="login-container" style="margin-top: 0; min-height: auto;">
-            <p class="login-subtitle">Acelerar.tech - Holding</p>
-        </div>
-        """, unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
     
-    col1, col2, col3 = st.columns([1, 1.5, 1])
+    # Campos de login centralizados
+    col1, col2, col3 = st.columns([1, 1.2, 1])
     with col2:
         with st.form("form_login"):
             email = st.text_input("📧 E-mail", placeholder="seu.email@empresa.com")
@@ -530,7 +519,7 @@ else:
     else:
         st.error("Erro ao carregar os dados das planilhas.")
 
-# Rodapé Dinâmico
+# Rodapé Dinâmico (Escondido via CSS para usuários, mas mantido no código para referência)
 st.markdown("---")
 st.markdown(f"""
     <div style='text-align: center; color: gray; font-size: 0.8rem;'>
