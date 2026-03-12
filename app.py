@@ -20,6 +20,8 @@ COLOR_CHURN = "#E74C3C"
 st.markdown(f"""
     <style>
     .main {{ background-color: {COLOR_BG}; }}
+    
+    /* Estilo Base dos Cards */
     div[data-testid="stMetric"] {{
         background-color: {COLOR_PRIMARY} !important;
         padding: 10px 15px !important;
@@ -28,6 +30,7 @@ st.markdown(f"""
         color: {COLOR_TEXT} !important;
         min-width: 180px !important;
     }}
+    
     div[data-testid="stMetricValue"] {{
         font-size: 1.6rem !important;
         white-space: nowrap !important;
@@ -35,31 +38,41 @@ st.markdown(f"""
         text-overflow: ellipsis !important;
         color: {COLOR_TEXT} !important;
     }}
+    
     div[data-testid="stMetricLabel"] > div {{
         color: {COLOR_TEXT} !important;
         font-weight: bold !important;
         font-size: 0.9rem !important;
     }}
+    
+    /* Destaque para o Card de Churn (Coluna 3) */
     div[data-testid="column"]:nth-of-type(3) div[data-testid="stMetric"] {{
         border: 2px solid {COLOR_CHURN} !important;
     }}
+    
     div[data-testid="column"]:nth-of-type(3) div[data-testid="stMetricLabel"] > div,
     div[data-testid="column"]:nth-of-type(3) div[data-testid="stMetricValue"] {{
         color: {COLOR_CHURN} !important;
     }}
+    
+    /* Estilo do Delta no Churn */
     div[data-testid="column"]:nth-of-type(3) div[data-testid="stMetricDelta"] > div {{
         background-color: rgba(231, 76, 60, 0.2) !important;
         color: {COLOR_CHURN} !important;
         padding: 2px 8px !important;
         border-radius: 15px !important;
     }}
+    
     div[data-testid="column"]:nth-of-type(3) div[data-testid="stMetricDelta"] svg {{
         fill: {COLOR_CHURN} !important;
         stroke: {COLOR_CHURN} !important;
     }}
+    
+    /* Estilo da Sidebar */
     [data-testid="stSidebar"] {{
         background-color: {COLOR_PRIMARY} !important;
     }}
+    
     [data-testid="stSidebar"] .stMarkdown p, 
     [data-testid="stSidebar"] label, 
     [data-testid="stSidebar"] .stExpander p,
@@ -67,27 +80,35 @@ st.markdown(f"""
         color: {COLOR_TEXT} !important;
         font-weight: 600 !important;
     }}
+    
     [data-testid="stSidebar"] .stSelectbox div[data-baseweb="select"],
     [data-testid="stSidebar"] .stMultiSelect div[data-baseweb="select"] {{
         background-color: #F8F9FA !important;
         color: {COLOR_PRIMARY} !important;
         border-radius: 5px !important;
     }}
+    
     [data-testid="stSidebar"] .stExpander {{
         background-color: rgba(255, 255, 255, 0.1) !important;
         border: 1px solid rgba(255, 255, 255, 0.2) !important;
         border-radius: 8px !important;
     }}
+    
+    /* Títulos e Gráficos */
     h1, h2, h3 {{
         color: {COLOR_SECONDARY} !important;
         font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif !important;
     }}
+    
+    /* White Label - Ocultar menus padrão do Streamlit */
     [data-testid="stHeader"] {{ display: none !important; }}
     [data-testid="stToolbar"] {{ display: none !important; }}
     footer {{ display: none !important; }}
     .stApp > header {{ display: none !important; }}
     [data-testid="stDecoration"] {{ display: none !important; }}
     a[href*="github"], a[href*="deploy"], a[href*="settings"] {{ display: none !important; }}
+    
+    /* Login Styles */
     .login-container {{
         display: flex;
         justify-content: center;
@@ -115,22 +136,22 @@ if 'usuario_logado' not in st.session_state: st.session_state.usuario_logado = F
 if 'email_usuario' not in st.session_state: st.session_state.email_usuario = None
 
 # Configurações de Empresas e Usuários
-EMPRESAS = {{
-    'VMC Tech': {{
+EMPRESAS = {
+    'VMC Tech': {
         'vendas_id': '1df7wNT1XQaiVK38vNdjbQudXkeH-lHTZWoYQ9gikZ0M',
         'vendas_gid': '1202307787',
         'cancelados_id': '1GDU6qVJ9Gf9C9lwHx2KwOiTltyeUPWhD_y3ODUczuTw',
         'cancelados_gid': '606807719',
         'contas_receber_id': '1Nqmn2c9p0QFu8LFIqFQ0EBxA8klHFUsVjAW15la-Fjg'
-    }},
-    'Victec': {{
+    },
+    'Victec': {
         'vendas_id': '1o0RJI58HW-NLX97Jab4YpKiM4b8_kIw2o11EL8iMgCo',
         'vendas_gid': '0',
         'cancelados_id': '1-eXWcie9mPwtWOiQDDiPlwrDmexvXeeQ4FAIDPEQ9c4',
         'cancelados_gid': '0',
         'contas_receber_id': '1Y28LP_ZPqWKMjXqf88ahzaDET_DneOYhxuNOmyinxus'
-    }}
-}}
+    }
+}
 USUARIOS_SHEET_ID = '15FsHefIdRzwUGm6FcpQQF-qiOtPwYHd-v70MwErOAMk'
 SENHA_MESTRA = 'Acelerar@2026'
 
@@ -138,20 +159,20 @@ SENHA_MESTRA = 'Acelerar@2026'
 @st.cache_data(ttl=600)
 def load_data(sheet_id, gid=None):
     if gid and gid != '0':
-        url = f"https://docs.google.com/spreadsheets/d/{{sheet_id}}/export?format=csv&gid={{gid}}"
+        url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv&gid={gid}"
     else:
-        url = f"https://docs.google.com/spreadsheets/d/{{sheet_id}}/export?format=csv"
+        url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv"
     try:
-        df = pd.read_csv(url )
+        df = pd.read_csv(url)
         df.columns = df.columns.str.strip()
         return df
     except:
         return pd.DataFrame()
 
 def load_usuarios():
-    url = f"https://docs.google.com/spreadsheets/d/{{USUARIOS_SHEET_ID}}/export?format=csv"
+    url = f"https://docs.google.com/spreadsheets/d/{USUARIOS_SHEET_ID}/export?format=csv"
     try:
-        df = pd.read_csv(url )
+        df = pd.read_csv(url)
         df.columns = df.columns.str.strip()
         return df
     except:
@@ -182,9 +203,9 @@ def render_login():
     st.markdown(f"""
         <div class="login-container">
             <div class="login-card">
-                {{"<img src='data:image/png;base64," + img_base64 + "' style='width: 150px; margin-bottom: 20px;'>" if img_base64 else ""}
-                <h1 style="color: {{COLOR_SECONDARY}}; font-size: 1.8rem; margin-bottom: 10px;">Dashboard Comercial</h1>
-                <p style="color: {{COLOR_TEXT}}; opacity: 0.8; margin-bottom: 30px;">Acelerar.tech - Holding</p>
+                {"<img src='data:image/png;base64," + img_base64 + "' style='width: 150px; margin-bottom: 20px;'>" if img_base64 else ""}
+                <h1 style="color: {COLOR_SECONDARY}; font-size: 1.8rem; margin-bottom: 10px;">Dashboard Comercial</h1>
+                <p style="color: {COLOR_TEXT}; opacity: 0.8; margin-bottom: 30px;">Acelerar.tech - Holding</p>
             </div>
         </div>
         """, unsafe_allow_html=True)
@@ -204,6 +225,7 @@ def render_login():
                         st.session_state.email_usuario = email
                         st.rerun()
                     else: st.error("❌ E-mail não autorizado.")
+
 def processar_dados(empresa):
     config = EMPRESAS[empresa]
     df_v = load_data(config['vendas_id'], config['vendas_gid'])
@@ -278,14 +300,14 @@ def render_page_comercial(df):
 
     st.title(f"📊 Resumo Comercial - {st.session_state.empresa}")
     c1, c2, c3, c4, c5 = st.columns(5)
-    c1.metric("MRR Conquistado", f"R$ {{int(mrr_conq):,}}".replace(",", "."))
-    c2.metric("MRR Ativo (Net)", f"R$ {{int(mrr_conq - mrr_perd):,}}".replace(",", "."))
-    c3.metric("MRR Perdido (Churn)", f"R$ {{int(mrr_perd):,}}".replace(",", "."), delta=f"{{-churn_p:.1f}}%", delta_color="inverse")
-    c4.metric("Total de Upsell", f"R$ {{int(upsell_v):,}}".replace(",", "."), delta=f"{{upsell_q}} eventos", delta_color="normal")
-    c5.metric("Ticket Médio", f"R$ {{int(tkt_med):,}}".replace(",", "."))
+    c1.metric("MRR Conquistado", f"R$ {int(mrr_conq):,}".replace(",", "."))
+    c2.metric("MRR Ativo (Net)", f"R$ {int(mrr_conq - mrr_perd):,}".replace(",", "."))
+    c3.metric("MRR Perdido (Churn)", f"R$ {int(mrr_perd):,}".replace(",", "."), delta=f"{-churn_p:.1f}%", delta_color="inverse")
+    c4.metric("Total de Upsell", f"R$ {int(upsell_v):,}".replace(",", "."), delta=f"{upsell_q} eventos", delta_color="normal")
+    c5.metric("Ticket Médio", f"R$ {int(tkt_med):,}".replace(",", "."))
     
     c6, c7, c8, c9 = st.columns(4)
-    c6.metric("Adesão Total", f"R$ {{int(df_f['adesao'].sum()):,}}".replace(",", "."))
+    c6.metric("Adesão Total", f"R$ {int(df_f['adesao'].sum()):,}".replace(",", "."))
     c7.metric("Clientes fechado", cl_fech)
     c8.metric("Clientes Cancelados", cl_canc)
     c9.metric("Total Base Ativa", base_ativa)
@@ -294,29 +316,29 @@ def render_page_comercial(df):
     st.subheader("📈 Evolução Mensal")
     col1, col2, col3 = st.columns(3)
     with col1:
-        df_m = df_ano[df_ano['status'] == 'Confirmada'].groupby(['mes_num','mes_nome']).agg({{'mrr':'sum', 'cliente':'count'}}).reset_index().sort_values('mes_num')
+        df_m = df_ano[df_ano['status'] == 'Confirmada'].groupby(['mes_num','mes_nome']).agg({'mrr':'sum', 'cliente':'count'}).reset_index().sort_values('mes_num')
         fig = px.bar(df_m, x='mes_nome', y='mrr', text='cliente', title="MRR Conquistado", color_discrete_sequence=[COLOR_PRIMARY])
-        fig.update_traces(texttemplate='%{{text}}', textposition='inside')
+        fig.update_traces(texttemplate='%{text}', textposition='inside')
         fig.update_layout(xaxis_title=None, yaxis_title=None, plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)')
         st.plotly_chart(fig, use_container_width=True)
     with col2:
-        df_u = df_ano[df_ano['upgrade'] > 0].groupby(['mes_num','mes_nome']).agg({{'upgrade':'sum', 'cliente':'count'}}).reset_index().sort_values('mes_num')
+        df_u = df_ano[df_ano['upgrade'] > 0].groupby(['mes_num','mes_nome']).agg({'upgrade':'sum', 'cliente':'count'}).reset_index().sort_values('mes_num')
         fig = px.bar(df_u, x='mes_nome', y='upgrade', text='cliente', title="Evolução de Upsell", color_discrete_sequence=[COLOR_SECONDARY])
-        fig.update_traces(texttemplate='%{{text}}', textposition='inside')
+        fig.update_traces(texttemplate='%{text}', textposition='inside')
         fig.update_layout(xaxis_title=None, yaxis_title=None, plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)')
         st.plotly_chart(fig, use_container_width=True)
     with col3:
-        df_c_evol = df_ano[df_ano['status'] == 'Cancelada'].groupby(['mes_num','mes_nome']).agg({{'mrr':'sum', 'cliente':'count'}}).reset_index().sort_values('mes_num')
+        df_c_evol = df_ano[df_ano['status'] == 'Cancelada'].groupby(['mes_num','mes_nome']).agg({'mrr':'sum', 'cliente':'count'}).reset_index().sort_values('mes_num')
         df_c_evol = df_c_evol[df_c_evol['mrr'] > 0]
         fig = px.bar(df_c_evol, x='mes_nome', y='mrr', text='cliente', title="Evolução de Churn", color_discrete_sequence=[COLOR_PRIMARY])
-        fig.update_traces(texttemplate='%{{text}}', textposition='inside')
+        fig.update_traces(texttemplate='%{text}', textposition='inside')
         fig.update_layout(xaxis_title=None, yaxis_title=None, plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)')
         st.plotly_chart(fig, use_container_width=True)
 
     st.divider()
     st.subheader("🎯 Performance vs. Metas")
     col4, col5 = st.columns(2)
-    df_meta = df_f[df_f['status'] == 'Confirmada'].groupby(['mes_num','mes_nome']).agg({{'mrr':'sum', 'cliente':'count'}}).reset_index().sort_values('mes_num')
+    df_meta = df_f[df_f['status'] == 'Confirmada'].groupby(['mes_num','mes_nome']).agg({'mrr':'sum', 'cliente':'count'}).reset_index().sort_values('mes_num')
     if not df_meta.empty:
         df_meta['mrr_a'] = df_meta['mrr'].cumsum()
         df_meta['cont_a'] = df_meta['cliente'].cumsum()
@@ -348,7 +370,7 @@ def render_page_comercial(df):
     with col_sdr2:
         df_rank_sdr_mrr = df_f[df_f['status'] == 'Confirmada'].groupby('sdr')['mrr'].sum().sort_values(ascending=True).reset_index()
         df_rank_sdr_mrr.columns = ['SDR', 'MRR']
-        fig_sdr_mrr = px.bar(df_rank_sdr_mrr.tail(5), x='MRR', y='SDR', orientation='h', title='Top 5 SDRs (MRR)', text=df_rank_sdr_mrr.tail(5)['MRR'].apply(lambda x: f"R$ {{int(x):,}}"), color_discrete_sequence=[COLOR_SECONDARY])
+        fig_sdr_mrr = px.bar(df_rank_sdr_mrr.tail(5), x='MRR', y='SDR', orientation='h', title='Top 5 SDRs (MRR)', text=df_rank_sdr_mrr.tail(5)['MRR'].apply(lambda x: f"R$ {int(x):,}"), color_discrete_sequence=[COLOR_SECONDARY])
         fig_sdr_mrr.update_traces(textposition='inside', textfont_color=COLOR_PRIMARY)
         fig_sdr_mrr.update_layout(xaxis_title=None, yaxis_title=None, plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', height=300)
         st.plotly_chart(fig_sdr_mrr, use_container_width=True)
@@ -366,7 +388,7 @@ def render_page_comercial(df):
     with col_rank2:
         df_rank_mrr = df_f[df_f['status'] == 'Confirmada'].groupby('vendedor')['mrr'].sum().sort_values(ascending=True).reset_index()
         df_rank_mrr.columns = ['Vendedor', 'MRR']
-        fig_mrr = px.bar(df_rank_mrr.tail(10), x='MRR', y='Vendedor', orientation='h', title='Top Vendedores (MRR)', text=df_rank_mrr.tail(10)['MRR'].apply(lambda x: f"R$ {{int(x):,}}"), color_discrete_sequence=[COLOR_SECONDARY])
+        fig_mrr = px.bar(df_rank_mrr.tail(10), x='MRR', y='Vendedor', orientation='h', title='Top Vendedores (MRR)', text=df_rank_mrr.tail(10)['MRR'].apply(lambda x: f"R$ {int(x):,}"), color_discrete_sequence=[COLOR_SECONDARY])
         fig_mrr.update_traces(textposition='inside', textfont_color=COLOR_PRIMARY)
         fig_mrr.update_layout(xaxis_title=None, yaxis_title=None, plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', height=400)
         st.plotly_chart(fig_mrr, use_container_width=True)
@@ -374,12 +396,13 @@ def render_page_comercial(df):
     st.divider()
     st.subheader("📋 Detalhamento")
     st.dataframe(df_f[['data', 'cliente', 'vendedor', 'sdr', 'produto', 'status', 'mrr', 'upgrade', 'adesao']].sort_values('data', ascending=False), use_container_width=True)
+
 def render_page_inadimplencia(df_cr):
     col_nav_left, col_nav_right = st.columns([0.8, 0.2])
     with col_nav_right:
         if st.button("📊 Comercial", use_container_width=True):
             st.session_state.page = 'comercial'; st.rerun()
-    st.title(f"📋 Inadimplência - {{st.session_state.empresa}}")
+    st.title(f"📋 Inadimplência - {st.session_state.empresa}")
     if df_cr.empty: st.warning("Sem dados."); return
     df_cr_proc = df_cr.copy()
     df_cr_proc.columns = df_cr_proc.columns.str.strip()
@@ -405,9 +428,9 @@ def render_page_inadimplencia(df_cr):
     repasse_sittax = total_aberto * 0.30
     
     c1, c2, c3 = st.columns(3)
-    c1.metric("Total em Aberto", f"R$ {{int(total_aberto):,}}".replace(",", "."))
+    c1.metric("Total em Aberto", f"R$ {int(total_aberto):,}".replace(",", "."))
     c2.metric("Clientes Inadimplentes", int(clientes_inadimplentes))
-    c3.metric("Repasse Sittax (30%)", f"R$ {{int(repasse_sittax):,}}".replace(",", "."))
+    c3.metric("Repasse Sittax (30%)", f"R$ {int(repasse_sittax):,}".replace(",", "."))
     
     st.divider()
     st.subheader("📊 Distribuição por Faixa de Atraso")
@@ -422,7 +445,7 @@ def render_page_inadimplencia(df_cr):
         fig.update_layout(font=dict(color='white'), plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)')
         st.plotly_chart(fig, use_container_width=True)
     with col_tabela:
-        df_aging_cliente = df_cr_proc[df_cr_proc['faixa_atraso'] != 'Sem Data'].groupby(nome_col if nome_col else (cpf_col if cpf_col else df_cr_proc.columns[0])).agg({{'valor_numerico': 'sum', 'data_vencimento': 'count'}}).reset_index()
+        df_aging_cliente = df_cr_proc[df_cr_proc['faixa_atraso'] != 'Sem Data'].groupby(nome_col if nome_col else (cpf_col if cpf_col else df_cr_proc.columns[0])).agg({'valor_numerico': 'sum', 'data_vencimento': 'count'}).reset_index()
         df_aging_cliente.columns = ['Cliente', 'Valor Total', 'Mensalidades']
         df_aging_cliente['Faixa'] = df_aging_cliente['Mensalidades'].apply(lambda x: '0-30 dias' if x==1 else ('31-60 dias' if x==2 else ('61-90 dias' if x==3 else '>90 dias')))
         st.dataframe(df_aging_cliente.sort_values(by='Mensalidades', ascending=False), use_container_width=True, hide_index=True)
@@ -434,7 +457,7 @@ def render_page_inadimplencia(df_cr):
 if not st.session_state.usuario_logado:
     render_login()
 else:
-    st.sidebar.markdown(f"<h4 style='color: white;'>👤 Usuário: {{st.session_state.email_usuario}}</h4>", unsafe_allow_html=True)
+    st.sidebar.markdown(f"<h4 style='color: white;'>👤 Usuário: {st.session_state.email_usuario}</h4>", unsafe_allow_html=True)
     df_p, df_cr = processar_dados(st.session_state.empresa)
     if df_p is not None:
         if st.session_state.page == 'comercial': render_page_comercial(df_p)
