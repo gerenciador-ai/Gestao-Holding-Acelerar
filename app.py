@@ -409,9 +409,10 @@ else:
             mrr_conq = df_f['mrr'].sum()
             
             # 2. Clientes Fechados: Contagem total de novos contratos ativados no mês
-            cl_fech = len(df_f[df_f['mrr'] > 0])
-            
-                      # 3. MRR Perdido (Churn do Mês): 
+            # Ajustado para contar todos os contratos (Sittax Simples + Sittax Recupera)
+            cl_fech = len(df_f)
+
+           # 3. MRR Perdido (Churn do Mês): 
             # REGRA DE NEGÓCIO: Filtra apenas cancelamentos do produto principal "Sittax Simples"
             # Isso garante que upgrades/serviços extras não inflem a contagem de clientes cancelados.
             df_churn_mes = df_p[
