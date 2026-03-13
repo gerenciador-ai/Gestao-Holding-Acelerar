@@ -604,15 +604,30 @@ else:
                 
                 st.divider()
                 
-                # 1. Gráfico de Rosca (Ocupando largura total)
-                st.subheader("📊 Clientes por Faixa de Atraso")
-                aging_data = df_cr_proc[df_cr_proc['faixa_atraso'] != 'Sem Data'].groupby('faixa_atraso')[cpf_col if cpf_col else df_cr_proc.columns[0]].nunique().reset_index()
-                aging_data.columns = ['Faixa', 'Quantidade']
+                # 1. Gráfico de Rosca (Aging por Pior Faixa - Unicidade de Cliente)
+                st.subheader("📊 Clientes por Faixa de Atraso (Pior Faixa)")
+                
+                # Define a ordem de criticidade das faixas
                 ordem_faixas = ['0-30 dias', '31-60 dias', '61-90 dias', '>90 dias']
+                col_id_cliente = cpf_col if cpf_col else df_cr_proc.columns[0]
+                
+                # Cria uma tabela temporária com a pior faixa de cada cliente
+                df_pior_faixa = df_cr_proc[df_cr_proc['faixa_atraso'] != 'Sem Data'].copy()
+                df_pior_faixa['faixa_cat'] = pd.Categorical(df_pior_faixa['faixa_atraso'], categories=ordem_faixas, ordered=True)
+                
+                # Para cada cliente, pega apenas a linha com a faixa mais alta (pior cenário)
+                df_pior_faixa = df_pior_faixa.sort_values(by=[col_id_cliente, 'faixa_cat'], ascending=[True, False])
+                df_clientes_unicos = df_pior_faixa.drop_duplicates(subset=[col_id_cliente], keep='first')
+                
+                # Agrupa para o gráfico
+                aging_data = df_clientes_unicos.groupby('faixa_atraso')[col_id_cliente].count().reset_index()
+                aging_data.columns = ['Faixa', 'Quantidade']
                 aging_data['Faixa'] = pd.Categorical(aging_data['Faixa'], categories=ordem_faixas, ordered=True)
                 aging_data = aging_data.sort_values('Faixa')
                 
-                fig = px.pie(aging_data, values='Quantidade', names='Faixa', hole=0.4, title="Distribuição de Inadimplentes", color_discrete_sequence=[COLOR_PRIMARY, COLOR_SECONDARY, '#FF6B6B', '#E74C3C'])
+                fig = px.pie(aging_data, values='Quantidade', names='Faixa', hole=0.4, 
+                             title="Distribuição de Clientes Únicos por Maior Atraso", 
+                             color_discrete_sequence=[COLOR_PRIMARY, COLOR_SECONDARY, '#FF6B6B', '#E74C3C'])
                 fig.update_layout(font=dict(color='white'), plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)')
                 st.plotly_chart(fig, use_container_width=True)
                 
