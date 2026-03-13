@@ -142,9 +142,9 @@ st.markdown(f"""
         flex-direction: column;
         justify-content: center;
         align-items: center;
-        min-height: 25vh; /* Reduzido para subir o logo */
+        min-height: 20vh; /* Reduzido ainda mais para subir o logo */
         background-color: transparent !important;
-        margin-top: 2vh; /* Reduzido para subir o logo ao máximo */
+        margin-top: 1vh; /* Reduzido para subir o logo ao máximo */
         text-align: center;
     }}
     
@@ -157,7 +157,7 @@ st.markdown(f"""
 
     /* Ajuste de Padding para evitar rolagem e subir conteúdo */
     .block-container {{
-        padding-top: 0.5rem !important;
+        padding-top: 0.2rem !important;
         padding-bottom: 1rem !important;
     }}
     </style>
@@ -354,13 +354,25 @@ else:
             st.image(logo_unidade_url, width=150)
             st.title(f"📊 Resumo Comercial - {st.session_state.empresa}")
             
-            # KPIs
-            mrr_conq = df_f[df_f['status'] == 'Confirmada']['mrr'].sum()
+            # --- CORREÇÃO DA LÓGICA DE KPIs (CONTABILIDADE COMERCIAL) ---
+            # MRR Conquistado: Soma total das vendas ativadas no mês (independente se cancelou depois)
+            mrr_conq = df_f['mrr'].sum()
+            
+            # MRR Perdido (Churn): Soma do MRR das vendas que estão com status 'Cancelada'
             mrr_perd = df_f[df_f['status'] == 'Cancelada']['mrr'].sum()
+            
+            # MRR Ativo (Net): Saldo líquido (Conquistado - Perdido)
+            mrr_ativo_net = mrr_conq - mrr_perd
+            
+            # Clientes Fechados: Contagem total de novos contratos ativados (independente se cancelou)
+            cl_fech = len(df_f[df_f['mrr'] > 0])
+            
+            # Clientes Cancelados: Contagem de cancelamentos no período
+            cl_canc = len(df_f[df_f['status'] == 'Cancelada'])
+            
+            # Outros cálculos
             upsell_v = df_f['upgrade'].sum()
             upsell_q = len(df_f[df_f['upgrade'] > 0])
-            cl_fech = len(df_f[(df_f['status'] == 'Confirmada') & (df_f['mrr'] > 0)])
-            cl_canc = len(df_f[df_f['status'] == 'Cancelada'])
             tkt_med = mrr_conq / cl_fech if cl_fech > 0 else 0
             base_ativa = len(df_p[df_p['status'] == 'Confirmada']) - len(df_p[df_p['status'] == 'Cancelada'])
             churn_p = (mrr_perd / mrr_conq * 100) if mrr_conq > 0 else 0
@@ -368,7 +380,7 @@ else:
             # LINHA 1 DE KPIs
             c1, c2, c3, c4, c5 = st.columns(5)
             c1.metric("MRR Conquistado", f"R$ {int(mrr_conq):,}".replace(",", "."))
-            c2.metric("MRR Ativo (Net)", f"R$ {int(mrr_conq - mrr_perd):,}".replace(",", "."))
+            c2.metric("MRR Ativo (Net)", f"R$ {int(mrr_ativo_net):,}".replace(",", "."))
             c3.metric("MRR Perdido (Churn)", f"R$ {int(mrr_perd):,}".replace(",", "."), delta=f"{-churn_p:.1f}%", delta_color="inverse")
             c4.metric("Total de Upsell", f"R$ {int(upsell_v):,}".replace(",", "."), delta=f"{upsell_q} eventos", delta_color="normal")
             c5.metric("Ticket Médio", f"R$ {int(tkt_med):,}".replace(",", "."))
@@ -386,7 +398,7 @@ else:
             st.subheader("📈 Evolução Mensal")
             col1, col2, col3 = st.columns(3)
             with col1:
-                df_m = df_ano[df_ano['status'] == 'Confirmada'].groupby(['mes_num','mes_nome']).agg({'mrr':'sum', 'cliente':'count'}).reset_index().sort_values('mes_num')
+                df_m = df_ano.groupby(['mes_num','mes_nome']).agg({'mrr':'sum', 'cliente':'count'}).reset_index().sort_values('mes_num')
                 fig = px.bar(df_m, x='mes_nome', y='mrr', text='cliente', title="MRR Conquistado", color_discrete_sequence=[COLOR_PRIMARY])
                 fig.update_traces(texttemplate='%{text}', textposition='inside')
                 fig.update_layout(xaxis_title=None, yaxis_title=None, plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)')
@@ -410,7 +422,7 @@ else:
             # METAS
             st.subheader("🎯 Performance vs. Metas")
             col4, col5 = st.columns(2)
-            df_meta = df_f[df_f['status'] == 'Confirmada'].groupby(['mes_num','mes_nome']).agg({'mrr':'sum', 'cliente':'count'}).reset_index().sort_values('mes_num')
+            df_meta = df_f.groupby(['mes_num','mes_nome']).agg({'mrr':'sum', 'cliente':'count'}).reset_index().sort_values('mes_num')
             if not df_meta.empty:
                 df_meta['mrr_a'] = df_meta['mrr'].cumsum()
                 df_meta['cont_a'] = df_meta['cliente'].cumsum()
@@ -438,12 +450,12 @@ else:
             st.markdown("#### 👤 Vendedores")
             col_vend1, col_vend2 = st.columns(2)
             with col_vend1:
-                df_rank_v_mrr = df_f[df_f['status'] == 'Confirmada'].groupby('vendedor')['mrr'].sum().sort_values(ascending=True).reset_index()
+                df_rank_v_mrr = df_f.groupby('vendedor')['mrr'].sum().sort_values(ascending=True).reset_index()
                 fig_v_mrr = px.bar(df_rank_v_mrr.tail(5), x='mrr', y='vendedor', orientation='h', title='Top 5 Vendedores (MRR)', text=df_rank_v_mrr.tail(5)['mrr'].apply(lambda x: f"R$ {int(x):,}"), color_discrete_sequence=[COLOR_PRIMARY])
                 fig_v_mrr.update_layout(xaxis_title=None, yaxis_title=None, plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', height=300)
                 st.plotly_chart(fig_v_mrr, use_container_width=True)
             with col_vend2:
-                df_rank_v_cont = df_f[df_f['status'] == 'Confirmada'].groupby('vendedor')['cliente'].count().sort_values(ascending=True).reset_index()
+                df_rank_v_cont = df_f.groupby('vendedor')['cliente'].count().sort_values(ascending=True).reset_index()
                 fig_v_cont = px.bar(df_rank_v_cont.tail(5), x='cliente', y='vendedor', orientation='h', title='Top 5 Vendedores (Contratos)', text=df_rank_v_cont.tail(5)['cliente'], color_discrete_sequence=[COLOR_SECONDARY])
                 fig_v_cont.update_layout(xaxis_title=None, yaxis_title=None, plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', height=300)
                 st.plotly_chart(fig_v_cont, use_container_width=True)
@@ -452,12 +464,12 @@ else:
             st.markdown("#### 🎧 SDRs")
             col_sdr1, col_sdr2 = st.columns(2)
             with col_sdr1:
-                df_rank_s_mrr = df_f[df_f['status'] == 'Confirmada'].groupby('sdr')['mrr'].sum().sort_values(ascending=True).reset_index()
+                df_rank_s_mrr = df_f.groupby('sdr')['mrr'].sum().sort_values(ascending=True).reset_index()
                 fig_s_mrr = px.bar(df_rank_s_mrr.tail(5), x='mrr', y='sdr', orientation='h', title='Top 5 SDRs (MRR)', text=df_rank_s_mrr.tail(5)['mrr'].apply(lambda x: f"R$ {int(x):,}"), color_discrete_sequence=[COLOR_PRIMARY])
                 fig_s_mrr.update_layout(xaxis_title=None, yaxis_title=None, plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', height=300)
                 st.plotly_chart(fig_s_mrr, use_container_width=True)
             with col_sdr2:
-                df_rank_s_cont = df_f[df_f['status'] == 'Confirmada'].groupby('sdr')['cliente'].count().sort_values(ascending=True).reset_index()
+                df_rank_s_cont = df_f.groupby('sdr')['cliente'].count().sort_values(ascending=True).reset_index()
                 fig_s_cont = px.bar(df_rank_s_cont.tail(5), x='cliente', y='sdr', orientation='h', title='Top 5 SDRs (Contratos)', text=df_rank_s_cont.tail(5)['cliente'], color_discrete_sequence=[COLOR_SECONDARY])
                 fig_s_cont.update_layout(xaxis_title=None, yaxis_title=None, plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', height=300)
                 st.plotly_chart(fig_s_cont, use_container_width=True)
