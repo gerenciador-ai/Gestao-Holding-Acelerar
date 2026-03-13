@@ -294,27 +294,37 @@ def processar_dados(empresa):
     df['status'] = 'Confirmada'
     df['data_cancelamento'] = pd.NaT
     
-    # 2. LÓGICA DE CHURN (CRUZAMENTO SEGURO SEM DUPLICAÇÃO)
+    # 2. LÓGICA DE CHURN (VINCULANDO CNPJ + DATA DE ATIVAÇÃO PARA EVITAR ERRO DE RE-VENDA)
     if not df_c.empty:
-        # Identifica colunas de forma flexível
+        # Identifica colunas de forma flexível na planilha de cancelados
         col_cnpj_c = next((c for c in df_c.columns if 'cnpj' in c.lower() or 'cliente' in c.lower()), df_c.columns[0])
-        col_data_c = next((c for c in df_c.columns if 'data' in c.lower() or 'cancelamento' in c.lower()), df_c.columns[-1])
+        col_data_canc = next((c for c in df_c.columns if 'data' in c.lower() and 'cancelamento' in c.lower()), df_c.columns[-1])
+        # Identifica a coluna de Data de Ativação na planilha de cancelados (Coluna L)
+        col_data_ativ_c = next((c for c in df_c.columns if 'ativação' in c.lower() or 'ativacao' in c.lower()), None)
         
-        # Limpa e Garante Unicidade na Base de Cancelados (Pega apenas a última data de cancelamento por CNPJ)
-        df_c_clean = pd.DataFrame()
-        df_c_clean['cnpj'] = df_c[col_cnpj_c].astype(str).str.replace(r'\D', '', regex=True)
-        df_c_clean['data_canc'] = pd.to_datetime(df_c[col_data_c], dayfirst=True, errors='coerce')
-        df_c_clean = df_c_clean.dropna(subset=['cnpj', 'data_canc']).sort_values('data_canc', ascending=False)
-        
-        # REMOVE DUPLICADOS: Garante que cada CNPJ apareça apenas uma vez na lista de cancelados
-        df_c_unique = df_c_clean.drop_duplicates(subset=['cnpj'])
-        
-        # MAPEAMENTO DIRETO (EVITA O MERGE QUE DUPLICA LINHAS)
-        mapa_datas = dict(zip(df_c_unique['cnpj'], df_c_unique['data_canc']))
-        df['data_cancelamento'] = df['cnpj'].map(mapa_datas)
-        
-        # Define o status final
-        df.loc[df['data_cancelamento'].notna(), 'status'] = 'Cancelada'
+        if col_data_ativ_c:
+            # Prepara a base de cancelados para o cruzamento
+            df_c_clean = pd.DataFrame()
+            df_c_clean['cnpj'] = df_c[col_cnpj_c].astype(str).str.replace(r'\D', '', regex=True)
+            df_c_clean['data_ativ_ref'] = pd.to_datetime(df_c[col_data_ativ_c], dayfirst=True, errors='coerce')
+            df_c_clean['data_canc_real'] = pd.to_datetime(df_c[col_data_canc], dayfirst=True, errors='coerce')
+            df_c_clean = df_c_clean.dropna(subset=['cnpj', 'data_ativ_ref', 'data_canc_real'])
+
+            # CRUZAMENTO (MERGE): Une vendas com cancelados usando CNPJ E DATA DE ATIVAÇÃO
+            # Isso garante que apenas a venda específica que foi cancelada seja marcada
+            df = df.merge(df_c_clean, left_on=['cnpj', 'data'], right_on=['cnpj', 'data_ativ_ref'], how='left')
+            
+            # Se houve o cruzamento, a coluna data_canc_real existirá
+            if 'data_canc_real' in df.columns:
+                df['data_cancelamento'] = df['data_canc_real']
+                df.loc[df['data_cancelamento'].notna(), 'status'] = 'Cancelada'
+                # Remove colunas temporárias do merge
+                df = df.drop(columns=['data_ativ_ref', 'data_canc_real'])
+        else:
+            # Caso não encontre a coluna de ativação, cria a coluna vazia para não dar erro
+            df['data_cancelamento'] = pd.NaT
+    else:
+        df['data_cancelamento'] = pd.NaT
         
     return df, df_cr
 
