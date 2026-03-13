@@ -46,6 +46,11 @@ st.markdown(f"""
         background-color: {COLOR_PRIMARY} !important;
     }}
     
+    /* REMOVER BOTÃO DE RECOLHER SIDEBAR (DEIXAR FIXO) */
+    button[data-testid="sidebar-collapse-button"] {{
+        display: none !important;
+    }}
+    
     /* Estilo Base dos Cards de KPI */
     div[data-testid="stMetric"] {{
         background-color: {COLOR_PRIMARY} !important;
@@ -259,7 +264,7 @@ def processar_dados(empresa):
     df_v = load_data(config['vendas_id'], config['vendas_gid'])
     df_c = load_data(config['cancelados_id'], config['cancelados_gid'])
     df_cr = load_data(config['contas_receber_id'])
-    if df_v.empty: return None, None
+    if df_v.empty: return None, None, None
     df = pd.DataFrame()
     df['vendedor'] = df_v['Vendedor'].fillna("N/A")
     df['sdr'] = df_v['SDR'].fillna("N/A")
@@ -275,22 +280,33 @@ def processar_dados(empresa):
     df['mes_num'] = df['data'].dt.month.astype(int)
     meses_pt = {1:'Janeiro', 2:'Fevereiro', 3:'Março', 4:'Abril', 5:'Maio', 6:'Junho', 7:'Julho', 8:'Agosto', 9:'Setembro', 10:'Outubro', 11:'Novembro', 12:'Dezembro'}
     df['mes_nome'] = df['mes_num'].map(meses_pt)
-    df['status'] = 'Confirmada'
+    
+    # Processamento de Churn (Baseado no CNPJ cruzado)
+    df_c_proc = pd.DataFrame()
     if not df_c.empty:
-        canc_cnpjs = df_c['CNPJ do Cliente'].astype(str).str.replace(r'\D', '', regex=True).unique()
-        df.loc[df['cnpj'].isin(canc_cnpjs), 'status'] = 'Cancelada'
-    return df, df_cr
+        df_c_proc['cnpj'] = df_c['CNPJ do Cliente'].astype(str).str.replace(r'\D', '', regex=True)
+        # Tenta encontrar a coluna de data de cancelamento
+        data_col = next((c for c in df_c.columns if 'data' in c.lower() or 'cancelamento' in c.lower()), df_c.columns[0])
+        df_c_proc['data'] = pd.to_datetime(df_c[data_col], errors='coerce')
+        df_c_proc = df_c_proc.dropna(subset=['data'])
+        df_c_proc['ano'] = df_c_proc['data'].dt.year.astype(int)
+        df_c_proc['mes_num'] = df_c_proc['data'].dt.month.astype(int)
+        df_c_proc['mes_nome'] = df_c_proc['mes_num'].map(meses_pt)
+        # Marcamos o status no df original
+        df['status'] = df['cnpj'].apply(lambda x: 'Cancelada' if x in df_c_proc['cnpj'].values else 'Confirmada')
+    else:
+        df['status'] = 'Confirmada'
+        
+    return df, df_cr, df_c_proc
 
 # LÓGICA DE EXECUÇÃO
 if not st.session_state.usuario_logado:
     render_login()
 else:
-    # 1. CARREGAMENTO DE DADOS (CRÍTICO PARA OS FILTROS)
-    df_p, df_cr = processar_dados(st.session_state.empresa)
+    df_p, df_cr, df_c = processar_dados(st.session_state.empresa)
     
-    # 2. RENDERIZAÇÃO DA SIDEBAR (GARANTIDA COM TODOS OS FILTROS)
     with st.sidebar:
-        # Logo Acelerar fixo no topo da sidebar e redimensionado via width
+        # Logo da Acelerar fixo no topo da sidebar
         st.image(LOGOS["ACELERAR_SIDEBAR"], width=160)
         st.markdown(f"<h4 style='color: white;'>👤 Usuário: {st.session_state.email_usuario}</h4>", unsafe_allow_html=True)
         st.divider()
@@ -302,10 +318,9 @@ else:
             st.cache_data.clear()
             st.rerun()
         
-        st.divider()
-        st.markdown("<h3 style='color: white; text-align: center;'>🔍 Filtros</h3>", unsafe_allow_html=True)
-        
         if df_p is not None:
+            st.divider()
+            st.markdown("<h3 style='color: white; text-align: center;'>🔍 Filtros</h3>", unsafe_allow_html=True)
             anos = sorted(df_p['ano'].unique(), reverse=True)
             ano_sel = st.selectbox("📅 Ano", anos)
             df_ano = df_p[df_p['ano'] == ano_sel]
@@ -318,66 +333,48 @@ else:
             prod_sel = st.selectbox("📦 Produto", ["Todos"] + sorted(df_p['produto'].unique().tolist()))
             vend_sel = st.selectbox("👤 Vendedor", ["Todos"] + sorted(df_p['vendedor'].unique().tolist()))
             sdr_sel = st.selectbox("🎧 SDR", ["Todos"] + sorted(df_p['sdr'].unique().tolist()))
-        else:
-            st.error("Dados não carregados.")
-            meses_sel = []
-            prod_sel = "Todos"
-            vend_sel = "Todos"
-            sdr_sel = "Todos"
-            df_ano = pd.DataFrame()
-
+        
         st.divider()
         if st.button("🚪 Sair", use_container_width=True):
             st.session_state.usuario_logado = False
             st.rerun()
 
-    # Lógica de Logo Dinâmico da Unidade
+    # Logo dinâmico da Unidade de Negócio
     logo_unidade_url = LOGOS["VMC_TECH"] if st.session_state.empresa == "VMC Tech" else LOGOS["VICTEC"]
 
-    # 3. RENDERIZAÇÃO DAS PÁGINAS
     if df_p is not None:
         if st.session_state.page == 'comercial':
-            # FILTRAGEM DE DADOS PARA A PÁGINA COMERCIAL
+            # Filtro de dados
             df_f = df_ano[df_ano['mes_nome'].isin(meses_sel)].copy()
             if prod_sel != "Todos": df_f = df_f[df_f['produto'] == prod_sel]
             if vend_sel != "Todos": df_f = df_f[df_f['vendedor'] == vend_sel]
             if sdr_sel != "Todos": df_f = df_f[df_f['sdr'] == sdr_sel]
 
-            # HEADER E NAVEGAÇÃO
+            # Botão de Navegação para Inadimplência
             col_nav_left, col_nav_right = st.columns([0.8, 0.2])
             with col_nav_right:
                 if st.button("📋 Inadimplência", use_container_width=True):
                     st.session_state.page = 'inadimplencia'
                     st.rerun()
 
-            # Logo da Unidade redimensionado via width acima do título
+            # Cabeçalho Dinâmico
             st.image(logo_unidade_url, width=150)
             st.title(f"📊 Resumo Comercial - {st.session_state.empresa}")
             
-            # --- CORREÇÃO DA LÓGICA DE KPIs (CONTABILIDADE COMERCIAL) ---
-            # MRR Conquistado: Soma total das vendas ativadas no mês (independente se cancelou depois)
-            mrr_conq = df_f['mrr'].sum()
-            
-            # MRR Perdido (Churn): Soma do MRR das vendas que estão com status 'Cancelada'
+            # Cálculos de KPI
+            mrr_conq = df_f[df_f['status'] == 'Confirmada']['mrr'].sum()
             mrr_perd = df_f[df_f['status'] == 'Cancelada']['mrr'].sum()
-            
-            # MRR Ativo (Net): Saldo líquido (Conquistado - Perdido)
             mrr_ativo_net = mrr_conq - mrr_perd
-            
-            # Clientes Fechados: Contagem total de novos contratos ativados (independente se cancelou)
-            cl_fech = len(df_f[df_f['mrr'] > 0])
-            
-            # Clientes Cancelados: Contagem de cancelamentos no período
+            cl_fech = len(df_f[df_f['status'] == 'Confirmada'])
             cl_canc = len(df_f[df_f['status'] == 'Cancelada'])
             
-            # Outros cálculos
             upsell_v = df_f['upgrade'].sum()
             upsell_q = len(df_f[df_f['upgrade'] > 0])
             tkt_med = mrr_conq / cl_fech if cl_fech > 0 else 0
-            base_ativa = len(df_p[df_p['status'] == 'Confirmada']) - len(df_p[df_p['status'] == 'Cancelada'])
+            base_ativa = len(df_p[df_p['status'] == 'Confirmada'])
             churn_p = (mrr_perd / mrr_conq * 100) if mrr_conq > 0 else 0
             
-            # LINHA 1 DE KPIs
+            # KPIs em colunas
             c1, c2, c3, c4, c5 = st.columns(5)
             c1.metric("MRR Conquistado", f"R$ {int(mrr_conq):,}".replace(",", "."))
             c2.metric("MRR Ativo (Net)", f"R$ {int(mrr_ativo_net):,}".replace(",", "."))
@@ -385,7 +382,6 @@ else:
             c4.metric("Total de Upsell", f"R$ {int(upsell_v):,}".replace(",", "."), delta=f"{upsell_q} eventos", delta_color="normal")
             c5.metric("Ticket Médio", f"R$ {int(tkt_med):,}".replace(",", "."))
             
-            # LINHA 2 DE KPIs
             c6, c7, c8, c9 = st.columns(4)
             c6.metric("Adesão Total", f"R$ {int(df_f['adesao'].sum()):,}".replace(",", "."))
             c7.metric("Clientes fechado", cl_fech)
@@ -394,11 +390,11 @@ else:
 
             st.divider()
             
-            # GRÁFICOS DE EVOLUÇÃO
+            # Gráficos de Evolução
             st.subheader("📈 Evolução Mensal")
             col1, col2, col3 = st.columns(3)
             with col1:
-                df_m = df_ano.groupby(['mes_num','mes_nome']).agg({'mrr':'sum', 'cliente':'count'}).reset_index().sort_values('mes_num')
+                df_m = df_ano[df_ano['status'] == 'Confirmada'].groupby(['mes_num','mes_nome']).agg({'mrr':'sum', 'cliente':'count'}).reset_index().sort_values('mes_num')
                 fig = px.bar(df_m, x='mes_nome', y='mrr', text='cliente', title="MRR Conquistado", color_discrete_sequence=[COLOR_PRIMARY])
                 fig.update_traces(texttemplate='%{text}', textposition='inside')
                 fig.update_layout(xaxis_title=None, yaxis_title=None, plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)')
@@ -411,7 +407,6 @@ else:
                 st.plotly_chart(fig, use_container_width=True)
             with col3:
                 df_c_evol = df_ano[df_ano['status'] == 'Cancelada'].groupby(['mes_num','mes_nome']).agg({'mrr':'sum', 'cliente':'count'}).reset_index().sort_values('mes_num')
-                df_c_evol = df_c_evol[df_c_evol['mrr'] > 0]
                 fig = px.bar(df_c_evol, x='mes_nome', y='mrr', text='cliente', title="Evolução de Churn", color_discrete_sequence=[COLOR_PRIMARY])
                 fig.update_traces(texttemplate='%{text}', textposition='inside')
                 fig.update_layout(xaxis_title=None, yaxis_title=None, plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)')
@@ -419,83 +414,58 @@ else:
 
             st.divider()
             
-            # METAS
-            st.subheader("🎯 Performance vs. Metas")
-            col4, col5 = st.columns(2)
-            df_meta = df_f.groupby(['mes_num','mes_nome']).agg({'mrr':'sum', 'cliente':'count'}).reset_index().sort_values('mes_num')
-            if not df_meta.empty:
-                df_meta['mrr_a'] = df_meta['mrr'].cumsum()
-                df_meta['cont_a'] = df_meta['cliente'].cumsum()
-                df_meta['meta_m'] = [8000 * (i+1) for i in range(len(df_meta))]
-                df_meta['meta_c'] = [17 * (i+1) for i in range(len(df_meta))]
-                with col4:
-                    fig = go.Figure()
-                    fig.add_trace(go.Bar(x=df_meta['mes_nome'], y=df_meta['mrr_a'], name='Real', marker_color=COLOR_PRIMARY))
-                    fig.add_trace(go.Scatter(x=df_meta['mes_nome'], y=df_meta['meta_m'], name='Meta (8k/mês)', line=dict(color='#F1C40F', width=4)))
-                    fig.update_layout(title="MRR Acumulado vs. Meta", xaxis_title=None, yaxis_title=None, plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)')
-                    st.plotly_chart(fig, use_container_width=True)
-                with col5:
-                    fig = go.Figure()
-                    fig.add_trace(go.Bar(x=df_meta['mes_nome'], y=df_meta['cont_a'], name='Real', marker_color=COLOR_SECONDARY))
-                    fig.add_trace(go.Scatter(x=df_meta['mes_nome'], y=df_meta['meta_c'], name='Meta (17/mês)', line=dict(color='#F39C12', width=4)))
-                    fig.update_layout(title="Contratos Acumulados vs. Meta", xaxis_title=None, yaxis_title=None, plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)')
-                    st.plotly_chart(fig, use_container_width=True)
-
-            st.divider()
-            
-            # RANKINGS EXPANDIDOS (VENDEDORES E SDRS)
+            # Rankings Expandidos (Vendedores e SDRs)
             st.subheader("🏆 Rankings de Performance Comercial")
             
-            # Rankings de Vendedores
+            # Ranking Vendedores
             st.markdown("#### 👤 Vendedores")
             col_vend1, col_vend2 = st.columns(2)
             with col_vend1:
-                df_rank_v_mrr = df_f.groupby('vendedor')['mrr'].sum().sort_values(ascending=True).reset_index()
+                df_rank_v_mrr = df_f[df_f['status'] == 'Confirmada'].groupby('vendedor')['mrr'].sum().sort_values(ascending=True).reset_index()
                 fig_v_mrr = px.bar(df_rank_v_mrr.tail(5), x='mrr', y='vendedor', orientation='h', title='Top 5 Vendedores (MRR)', text=df_rank_v_mrr.tail(5)['mrr'].apply(lambda x: f"R$ {int(x):,}"), color_discrete_sequence=[COLOR_PRIMARY])
                 fig_v_mrr.update_layout(xaxis_title=None, yaxis_title=None, plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', height=300)
                 st.plotly_chart(fig_v_mrr, use_container_width=True)
             with col_vend2:
-                df_rank_v_cont = df_f.groupby('vendedor')['cliente'].count().sort_values(ascending=True).reset_index()
+                df_rank_v_cont = df_f[df_f['status'] == 'Confirmada'].groupby('vendedor')['cliente'].count().sort_values(ascending=True).reset_index()
                 fig_v_cont = px.bar(df_rank_v_cont.tail(5), x='cliente', y='vendedor', orientation='h', title='Top 5 Vendedores (Contratos)', text=df_rank_v_cont.tail(5)['cliente'], color_discrete_sequence=[COLOR_SECONDARY])
                 fig_v_cont.update_layout(xaxis_title=None, yaxis_title=None, plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', height=300)
                 st.plotly_chart(fig_v_cont, use_container_width=True)
             
-            # Rankings de SDRs
+            # Ranking SDRs
             st.markdown("#### 🎧 SDRs")
             col_sdr1, col_sdr2 = st.columns(2)
             with col_sdr1:
-                df_rank_s_mrr = df_f.groupby('sdr')['mrr'].sum().sort_values(ascending=True).reset_index()
+                df_rank_s_mrr = df_f[df_f['status'] == 'Confirmada'].groupby('sdr')['mrr'].sum().sort_values(ascending=True).reset_index()
                 fig_s_mrr = px.bar(df_rank_s_mrr.tail(5), x='mrr', y='sdr', orientation='h', title='Top 5 SDRs (MRR)', text=df_rank_s_mrr.tail(5)['mrr'].apply(lambda x: f"R$ {int(x):,}"), color_discrete_sequence=[COLOR_PRIMARY])
                 fig_s_mrr.update_layout(xaxis_title=None, yaxis_title=None, plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', height=300)
                 st.plotly_chart(fig_s_mrr, use_container_width=True)
             with col_sdr2:
-                df_rank_s_cont = df_f.groupby('sdr')['cliente'].count().sort_values(ascending=True).reset_index()
+                df_rank_s_cont = df_f[df_f['status'] == 'Confirmada'].groupby('sdr')['cliente'].count().sort_values(ascending=True).reset_index()
                 fig_s_cont = px.bar(df_rank_s_cont.tail(5), x='cliente', y='sdr', orientation='h', title='Top 5 SDRs (Contratos)', text=df_rank_s_cont.tail(5)['cliente'], color_discrete_sequence=[COLOR_SECONDARY])
                 fig_s_cont.update_layout(xaxis_title=None, yaxis_title=None, plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', height=300)
                 st.plotly_chart(fig_s_cont, use_container_width=True)
 
             st.divider()
             st.subheader("📋 Detalhamento")
-            st.dataframe(df_f[['data', 'cliente', 'vendedor', 'sdr', 'produto', 'status', 'mrr', 'upgrade', 'adesao']].sort_values('data', ascending=False), use_container_width=True)
+            st.dataframe(df_f[['data', 'cliente', 'vendedor', 'sdr', 'produto', 'mrr', 'upgrade', 'adesao', 'status']].sort_values('data', ascending=False), use_container_width=True)
         
         else:
-            # PÁGINA DE INADIMPLÊNCIA
+            # ABA DE INADIMPLÊNCIA
             col_nav_left, col_nav_right = st.columns([0.8, 0.2])
             with col_nav_right:
                 if st.button("📊 Comercial", use_container_width=True):
                     st.session_state.page = 'comercial'
                     st.rerun()
             
-            # Logo da Unidade redimensionado via width acima do título
             st.image(logo_unidade_url, width=150)
             st.title(f"📋 Inadimplência - {st.session_state.empresa}")
             
             if df_cr.empty:
                 st.warning("Sem dados de inadimplência disponíveis.")
             else:
+                # Processamento de Inadimplência
                 df_cr_proc = df_cr.copy()
                 df_cr_proc.columns = df_cr_proc.columns.str.strip()
-                
                 valor_col = next((c for c in df_cr_proc.columns if 'valor' in c.lower()), None)
                 venc_col = next((c for c in df_cr_proc.columns if 'vencimento' in c.lower()), None)
                 cpf_col = next((c for c in df_cr_proc.columns if 'cpf' in c.lower() or 'cnpj' in c.lower()), None)
@@ -548,7 +518,7 @@ else:
     else:
         st.error("Erro ao carregar os dados das planilhas.")
 
-# Rodapé Dinâmico (Escondido via CSS para usuários, mas mantido no código para referência)
+# Rodapé Dinâmico
 st.markdown("---")
 st.markdown(f"""
     <div style='text-align: center; color: gray; font-size: 0.8rem;'>
