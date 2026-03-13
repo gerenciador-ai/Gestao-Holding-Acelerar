@@ -122,12 +122,10 @@ st.markdown(f"""
     }}
     
     /* WHITE LABEL - CAMUFLAGEM VISUAL (MODO INVISÍVEL) */
-    /* Em vez de esconder o header todo, camuflamos os botões indesejados */
     header[data-testid="stHeader"] {{ 
         background-color: rgba(0,0,0,0) !important;
     }}
     
-    /* Camuflagem dos botões de Share, GitHub e Menu */
     button[title="View source on GitHub"], 
     button[title="Share this app"], 
     #MainMenu {{ 
@@ -138,7 +136,6 @@ st.markdown(f"""
         pointer-events: none !important;
     }}
     
-    /* Garantir que o botão de abrir sidebar (setinha) continue visível e funcional */
     [data-testid="stSidebarCollapsedControl"] {{
         opacity: 1 !important;
         pointer-events: auto !important;
@@ -148,11 +145,9 @@ st.markdown(f"""
     [data-testid="stDecoration"] {{ display: none !important; }}
     [data-testid="stToolbar"] {{ display: none !important; }}
     
-    /* Esconder rodapé "Gerenciar aplicativo" no Streamlit Cloud */
     .viewerBadge_container__1QS1n, .viewerBadge_link__3S19W {{ display: none !important; }}
     [data-testid="stStatusWidget"] {{ display: none !important; }}
     
-    /* Login Styles - ESTÉTICA CLEAN E REPOSICIONADA (MAIS ALTO NA TELA) */
     .login-container {{
         display: flex;
         flex-direction: column;
@@ -164,14 +159,12 @@ st.markdown(f"""
         text-align: center;
     }}
     
-    /* Estilo dos campos de input no login */
     div[data-testid="stForm"] {{
         border: none !important;
         padding: 0 !important;
         background-color: transparent !important;
     }}
 
-    /* Ajuste de Padding para evitar rolagem e subir conteúdo */
     .block-container {{
         padding-top: 0.2rem !important;
         padding-bottom: 1rem !important;
@@ -206,19 +199,19 @@ USUARIOS_SHEET_ID = '15FsHefIdRzwUGm6FcpQQF-qiOtPwYHd-v70MwErOAMk'
 SENHA_MESTRA = 'Acelerar@2026'
 
 # Funções de Carregamento de Dados com Cache Otimizado
-@st.cache_data(ttl=600, show_spinner="Carregando dados das planilhas...")
-def load_data(sheet_id, gid=None):
-    if gid and gid != '0':
-        url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv&gid={gid}"
-    else:
-        url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv"
-    try:
-        df = pd.read_csv(url, on_bad_lines='skip', low_memory=False)
-        df.columns = df.columns.str.strip()
-        return df
-    except Exception as e:
-        st.error(f"Erro ao conectar com o Google Sheets: {str(e)}")
-        return pd.DataFrame()
+@st.cache_data(ttl=600)
+def load_data(sheet_id, gid=None, msg="Carregando dados..."):
+    with st.spinner(msg):
+        if gid and gid != '0':
+            url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv&gid={gid}"
+        else:
+            url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv"
+        try:
+            df = pd.read_csv(url, on_bad_lines='skip', low_memory=False)
+            df.columns = df.columns.str.strip()
+            return df
+        except Exception as e:
+            return pd.DataFrame()
 
 def load_usuarios():
     url = f"https://docs.google.com/spreadsheets/d/{USUARIOS_SHEET_ID}/export?format=csv"
@@ -267,9 +260,9 @@ def render_login():
 
 def processar_dados(empresa):
     config = EMPRESAS[empresa]
-    df_v = load_data(config['vendas_id'], config['vendas_gid'])
-    df_c = load_data(config['cancelados_id'], config['cancelados_gid'])
-    df_cr = load_data(config['contas_receber_id'])
+    df_v = load_data(config['vendas_id'], config['vendas_gid'], "Lendo base de Vendas...")
+    df_c = load_data(config['cancelados_id'], config['cancelados_gid'], "Lendo base de Cancelados...")
+    df_cr = load_data(config['contas_receber_id'], msg="Lendo base de Inadimplência...")
     
     if df_v.empty: return None, None, None
     
@@ -290,7 +283,7 @@ def processar_dados(empresa):
     meses_pt = {1:'Janeiro', 2:'Fevereiro', 3:'Março', 4:'Abril', 5:'Maio', 6:'Junho', 7:'Julho', 8:'Agosto', 9:'Setembro', 10:'Outubro', 11:'Novembro', 12:'Dezembro'}
     df['mes_nome'] = df['mes_num'].map(meses_pt)
     
-    # Processamento de Cancelados (Churn) - Apenas a lista de CNPJs e Datas
+    # Processamento de Cancelados (Churn)
     df_canc_proc = pd.DataFrame()
     if not df_c.empty:
         df_canc_proc['cnpj'] = df_c['CNPJ do Cliente'].astype(str).str.replace(r'\D', '', regex=True)
@@ -321,7 +314,6 @@ else:
             st.cache_data.clear()
             st.rerun()
         
-        # SIDEBAR INTELIGENTE: Filtros apenas na página Comercial
         if st.session_state.page == 'comercial' and df_p is not None:
             st.divider()
             st.markdown("<h3 style='color: white; text-align: center;'>🔍 Filtros</h3>", unsafe_allow_html=True)
@@ -361,7 +353,6 @@ else:
             st.image(logo_unidade_url, width=150)
             st.title(f"📊 Resumo Comercial - {st.session_state.empresa}")
             
-            # CORREÇÃO CHURN: Cruzar CNPJs cancelados com a base de Vendas para obter o MRR
             if df_c is not None and not df_c.empty:
                 df_c_periodo = df_c[(df_c['ano'] == ano_sel) & (df_c['mes_nome'].isin(meses_sel))]
                 df_c_f = pd.merge(df_c_periodo, df_p[['cnpj', 'mrr', 'cliente']], on='cnpj', how='left').drop_duplicates(subset=['cnpj'])
@@ -450,7 +441,6 @@ else:
             st.dataframe(df_f[['data', 'cliente', 'vendedor', 'sdr', 'produto', 'mrr', 'upgrade', 'adesao']].sort_values('data', ascending=False), use_container_width=True)
         
         else:
-            # PÁGINA DE INADIMPLÊNCIA
             col_nav_left, col_nav_right = st.columns([0.8, 0.2])
             with col_nav_right:
                 if st.button("📊 Comercial", use_container_width=True):
@@ -482,7 +472,6 @@ else:
                     else: return '>90 dias'
                 df_cr_proc['faixa_atraso'] = df_cr_proc['dias_atraso'].apply(categorizar_atraso)
                 
-                # CORREÇÃO AGING: Regra da Pior Faixa
                 df_pior_faixa = df_cr_proc.sort_values('dias_atraso', ascending=False).drop_duplicates(subset=[cpf_col if cpf_col else nome_col])
                 
                 total_aberto = df_cr_proc['valor_numerico'].sum()
