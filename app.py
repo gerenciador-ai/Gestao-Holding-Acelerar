@@ -350,28 +350,37 @@ else:
             st.rerun()
         
         st.divider()
-        st.markdown("<h3 style='color: white; text-align: center;'>🔍 Filtros</h3>", unsafe_allow_html=True)
         
-        if df_p is not None:
-            anos = sorted(df_p['ano'].unique(), reverse=True)
-            ano_sel = st.selectbox("📅 Ano", anos)
-            df_ano = df_p[df_p['ano'] == ano_sel]
-            
-            with st.expander("📅 Meses"):
-                meses_ordem = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro']
-                meses_disp = [m for m in meses_ordem if m in df_ano['mes_nome'].unique()]
-                meses_sel = st.multiselect("Selecionar", meses_disp, default=meses_disp)
-            
-            prod_sel = st.selectbox("📦 Produto", ["Todos"] + sorted(df_p['produto'].unique().tolist()))
-            vend_sel = st.selectbox("👤 Vendedor", ["Todos"] + sorted(df_p['vendedor'].unique().tolist()))
-            sdr_sel = st.selectbox("🎧 SDR", ["Todos"] + sorted(df_p['sdr'].unique().tolist()))
+        if st.session_state.page != 'inadimplencia':
+            st.markdown("<h3 style='color: white; text-align: center;'>🔍 Filtros</h3>", unsafe_allow_html=True)
+            if df_p is not None:
+                anos = sorted(df_p['ano'].unique(), reverse=True)
+                ano_sel = st.selectbox("📅 Ano", anos)
+                df_ano = df_p[df_p['ano'] == ano_sel]
+                
+                with st.expander("📅 Meses"):
+                    meses_ordem = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro']
+                    meses_disp = [m for m in meses_ordem if m in df_ano['mes_nome'].unique()]
+                    meses_sel = st.multiselect("Selecionar", meses_disp, default=meses_disp)
+                
+                prod_sel = st.selectbox("📦 Produto", ["Todos"] + sorted(df_p['produto'].unique().tolist()))
+                vend_sel = st.selectbox("👤 Vendedor", ["Todos"] + sorted(df_p['vendedor'].unique().tolist()))
+                sdr_sel = st.selectbox("🎧 SDR", ["Todos"] + sorted(df_p['sdr'].unique().tolist()))
+            else:
+                st.error("Dados não carregados.")
+                meses_sel = []
+                prod_sel = "Todos"
+                vend_sel = "Todos"
+                sdr_sel = "Todos"
+                df_ano = pd.DataFrame()
         else:
-            st.error("Dados não carregados.")
-            meses_sel = []
+            # Valores padrão para a página de Inadimplência
+            ano_sel = 2026
+            meses_sel = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro']
             prod_sel = "Todos"
             vend_sel = "Todos"
             sdr_sel = "Todos"
-            df_ano = pd.DataFrame()
+            df_ano = df_p.copy() if df_p is not None else pd.DataFrame()
 
         st.divider()
         if st.button("🚪 Sair", use_container_width=True):
