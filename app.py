@@ -41,11 +41,21 @@ st.markdown(f"""
     /* Fundo Principal */
     .main {{ background-color: {COLOR_BG}; }}
     
-    /* Layout Fluido da Sidebar */
+    /* Layout Fluido da Sidebar e REMOVER BOTÃO DE RECOLHER (DEIXAR FIXO) */
     [data-testid="stSidebar"] {{
         background-color: {COLOR_PRIMARY} !important;
     }}
     
+    /* Esconde o botão de fechar (dentro da sidebar) */
+    button[data-testid="sidebar-collapse-button"] {{
+        display: none !important;
+    }}
+    
+    /* Esconde o botão de abrir (no topo da página) */
+    button[kind="headerNoPadding"] {{
+        display: none !important;
+    }}
+
     /* Estilo Base dos Cards de KPI */
     div[data-testid="stMetric"] {{
         background-color: {COLOR_PRIMARY} !important;
