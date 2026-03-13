@@ -273,13 +273,13 @@ def processar_dados(empresa):
     meses_pt = {1:'Janeiro', 2:'Fevereiro', 3:'Março', 4:'Abril', 5:'Maio', 6:'Junho', 7:'Julho', 8:'Agosto', 9:'Setembro', 10:'Outubro', 11:'Novembro', 12:'Dezembro'}
     df['mes_nome'] = df['mes_num'].map(meses_pt)
     
-    # Processamento de Cancelados (Churn)
+    # Processamento de Cancelados (Churn) - Apenas a lista de CNPJs e Datas
     df_canc_proc = pd.DataFrame()
     if not df_c.empty:
-        df_canc_proc['cliente'] = df_c['Cliente'].fillna("N/A")
         df_canc_proc['cnpj'] = df_c['CNPJ do Cliente'].astype(str).str.replace(r'\D', '', regex=True)
-        df_canc_proc['mrr'] = parse_currency(df_c['Mensalidade - Simples'])
-        df_canc_proc['data'] = pd.to_datetime(df_c['Data do Cancelamento'], errors='coerce')
+        # Tenta encontrar a coluna de data de cancelamento
+        data_canc_col = next((c for c in df_c.columns if 'cancelamento' in c.lower() or 'data' in c.lower()), df_c.columns[0])
+        df_canc_proc['data'] = pd.to_datetime(df_c[data_canc_col], errors='coerce')
         df_canc_proc = df_canc_proc.dropna(subset=['data'])
         df_canc_proc['ano'] = df_canc_proc['data'].dt.year.astype(int)
         df_canc_proc['mes_num'] = df_canc_proc['data'].dt.month.astype(int)
@@ -345,8 +345,14 @@ else:
             st.image(logo_unidade_url, width=150)
             st.title(f"📊 Resumo Comercial - {st.session_state.empresa}")
             
-            # CORREÇÃO CHURN: Buscar cancelados do período selecionado
-            df_c_f = df_c[(df_c['ano'] == ano_sel) & (df_c['mes_nome'].isin(meses_sel))] if df_c is not None else pd.DataFrame()
+            # CORREÇÃO CHURN: Cruzar CNPJs cancelados com a base de Vendas para obter o MRR
+            if df_c is not None and not df_c.empty:
+                # Filtra cancelados do período selecionado
+                df_c_periodo = df_c[(df_c['ano'] == ano_sel) & (df_c['mes_nome'].isin(meses_sel))]
+                # Cruza com a base total de vendas (df_p) para pegar o MRR original
+                df_c_f = pd.merge(df_c_periodo, df_p[['cnpj', 'mrr', 'cliente']], on='cnpj', how='left').drop_duplicates(subset=['cnpj'])
+            else:
+                df_c_f = pd.DataFrame()
             
             mrr_conq = df_f['mrr'].sum()
             mrr_perd = df_c_f['mrr'].sum() if not df_c_f.empty else 0
@@ -389,9 +395,11 @@ else:
                 fig.update_layout(xaxis_title=None, yaxis_title=None, plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)')
                 st.plotly_chart(fig, use_container_width=True)
             with col3:
-                if df_c is not None:
-                    df_c_evol = df_c[df_c['ano'] == ano_sel].groupby(['mes_num','mes_nome']).agg({'mrr':'sum', 'cliente':'count'}).reset_index().sort_values('mes_num')
-                    fig = px.bar(df_c_evol, x='mes_nome', y='mrr', text='cliente', title="Evolução de Churn", color_discrete_sequence=[COLOR_PRIMARY])
+                if df_c is not None and not df_c.empty:
+                    # Evolução de Churn precisa cruzar com Vendas para ter o MRR por mês
+                    df_c_evol_data = pd.merge(df_c[df_c['ano'] == ano_sel], df_p[['cnpj', 'mrr']], on='cnpj', how='left').drop_duplicates(subset=['cnpj'])
+                    df_c_evol = df_c_evol_data.groupby(['mes_num','mes_nome']).agg({'mrr':'sum', 'cnpj':'count'}).reset_index().sort_values('mes_num')
+                    fig = px.bar(df_c_evol, x='mes_nome', y='mrr', text='cnpj', title="Evolução de Churn", color_discrete_sequence=[COLOR_PRIMARY])
                     fig.update_traces(texttemplate='%{text}', textposition='inside')
                     fig.update_layout(xaxis_title=None, yaxis_title=None, plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)')
                     st.plotly_chart(fig, use_container_width=True)
