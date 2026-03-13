@@ -282,7 +282,8 @@ def processar_dados(empresa):
     df['mrr'] = parse_currency(df_v['Mensalidade - Simples'])
     df['adesao'] = parse_currency(df_v['Adesão - Simples']) + parse_currency(df_v['Adesão - Recupera'])
     df['upgrade'] = parse_currency(df_v['Aumento da mensalidade'])
-    df['data'] = pd.to_datetime(df_v['Data de Ativação'], errors='coerce')
+    # Força o formato brasileiro na data de ativação
+    df['data'] = pd.to_datetime(df_v['Data de Ativação'], dayfirst=True, errors='coerce')
     df = df.dropna(subset=['data'])
     df['ano'] = df['data'].dt.year.astype(int)
     df['mes_num'] = df['data'].dt.month.astype(int)
@@ -292,6 +293,7 @@ def processar_dados(empresa):
     
     # Inicializa todos como Confirmada
     df['status'] = 'Confirmada'
+    df['data_cancelamento'] = pd.NaT
     
     # LÓGICA DE CHURN REAL (CRUZAMENTO POR CNPJ)
     if not df_c.empty:
@@ -302,16 +304,19 @@ def processar_dados(empresa):
         # Limpeza da base de cancelados
         df_c_clean = pd.DataFrame()
         df_c_clean['cnpj_canc'] = df_c[col_cnpj_c].astype(str).str.replace(r'\D', '', regex=True)
-        df_c_clean['data_canc'] = pd.to_datetime(df_c[col_data_c], errors='coerce')
+        # FORÇA O FORMATO BRASILEIRO (DD/MM/AAAA) NA DATA DE CANCELAMENTO
+        df_c_clean['data_canc'] = pd.to_datetime(df_c[col_data_c], dayfirst=True, errors='coerce')
+        
+        # Remove registros sem CNPJ ou sem Data de cancelamento
+        df_c_clean = df_c_clean.dropna(subset=['cnpj_canc', 'data_canc'])
         
         # Mapeia a data de cancelamento para a base de vendas usando o CNPJ
-        mapeamento_canc = dict(zip(df_c_clean['cnpj_canc'], df_c_clean['data_canc']))
+        # IMPORTANTE: Se o cliente cancelou mais de uma vez, pegamos a data mais recente
+        mapeamento_canc = df_c_clean.sort_values('data_canc').set_index('cnpj_canc')['data_canc'].to_dict()
         df['data_cancelamento'] = df['cnpj'].map(mapeamento_canc)
         
         # Define como 'Cancelada' se houver data de cancelamento
         df.loc[df['data_cancelamento'].notna(), 'status'] = 'Cancelada'
-    else:
-        df['data_cancelamento'] = pd.NaT
         
     return df, df_cr
 
