@@ -604,27 +604,41 @@ else:
                 
                 st.divider()
                 
-                st.subheader("📊 Distribuição por Faixa de Atraso")
-                col_rosca, col_tabela = st.columns([1.2, 1.8])
-                with col_rosca:
-                    aging_data = df_cr_proc[df_cr_proc['faixa_atraso'] != 'Sem Data'].groupby('faixa_atraso')[cpf_col if cpf_col else df_cr_proc.columns[0]].nunique().reset_index()
-                    aging_data.columns = ['Faixa', 'Quantidade']
-                    ordem_faixas = ['0-30 dias', '31-60 dias', '61-90 dias', '>90 dias']
-                    aging_data['Faixa'] = pd.Categorical(aging_data['Faixa'], categories=ordem_faixas, ordered=True)
-                    aging_data = aging_data.sort_values('Faixa')
-                    fig = px.pie(aging_data, values='Quantidade', names='Faixa', hole=0.4, title="Clientes por Faixa", color_discrete_sequence=[COLOR_PRIMARY, COLOR_SECONDARY, '#FF6B6B', '#E74C3C'])
-                    fig.update_layout(font=dict(color='white'), plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)')
-                    st.plotly_chart(fig, use_container_width=True)
-                with col_tabela:
-                    st.markdown("### 📋 Resumo por Cliente")
-                    df_aging_cliente = df_cr_proc[df_cr_proc['faixa_atraso'] != 'Sem Data'].groupby(nome_col if nome_col else (cpf_col if cpf_col else df_cr_proc.columns[0])).agg({'valor_numerico': 'sum', 'data_vencimento': 'count'}).reset_index()
-                    df_aging_cliente.columns = ['Cliente', 'Valor Total', 'Mensalidades']
-                    df_aging_cliente['Faixa de Atraso'] = df_aging_cliente['Mensalidades'].apply(lambda x: '0-30 dias' if x==1 else ('31-60 dias' if x==2 else ('61-90 dias' if x==3 else '>90 dias')))
-                    st.dataframe(df_aging_cliente.sort_values(by='Mensalidades', ascending=False), use_container_width=True, hide_index=True)
+                # 1. Gráfico de Rosca (Ocupando largura total)
+                st.subheader("📊 Clientes por Faixa de Atraso")
+                aging_data = df_cr_proc[df_cr_proc['faixa_atraso'] != 'Sem Data'].groupby('faixa_atraso')[cpf_col if cpf_col else df_cr_proc.columns[0]].nunique().reset_index()
+                aging_data.columns = ['Faixa', 'Quantidade']
+                ordem_faixas = ['0-30 dias', '31-60 dias', '61-90 dias', '>90 dias']
+                aging_data['Faixa'] = pd.Categorical(aging_data['Faixa'], categories=ordem_faixas, ordered=True)
+                aging_data = aging_data.sort_values('Faixa')
+                
+                fig = px.pie(aging_data, values='Quantidade', names='Faixa', hole=0.4, title="Distribuição de Inadimplentes", color_discrete_sequence=[COLOR_PRIMARY, COLOR_SECONDARY, '#FF6B6B', '#E74C3C'])
+                fig.update_layout(font=dict(color='white'), plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)')
+                st.plotly_chart(fig, use_container_width=True)
                 
                 st.divider()
+                
+                # 2. Tabela de Resumo por Cliente (Ocupando largura total abaixo do gráfico)
+                st.subheader("👥 Resumo por Cliente")
+                col_cliente = nome_col if nome_col else (cpf_col if cpf_col else df_cr_proc.columns[0])
+                df_aging_cliente = df_cr_proc[df_cr_proc['faixa_atraso'] != 'Sem Data'].groupby(col_cliente).agg({
+                    'valor_numerico': 'sum', 
+                    'data_vencimento': 'count'
+                }).reset_index()
+                df_aging_cliente.columns = ['Cliente', 'Valor Total', 'Mensalidades em Atraso']
+                
+                # Formata o valor para Real (R$)
+                df_aging_cliente_view = df_aging_cliente.copy()
+                df_aging_cliente_view['Valor Total'] = df_aging_cliente_view['Valor Total'].apply(lambda x: f"R$ {x:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+                
+                st.dataframe(df_aging_cliente_view.sort_values(by='Mensalidades em Atraso', ascending=False), use_container_width=True, hide_index=True)
+                
+                st.divider()
+                
+                # 3. Detalhamento de Títulos (Largura total)
                 st.subheader("📋 Detalhamento de Títulos")
-                st.dataframe(df_cr_proc[[venc_col, cpf_col, nome_col, valor_col, 'faixa_atraso']].sort_values(by=venc_col), use_container_width=True)
+                st.dataframe(df_cr_proc[[venc_col, cpf_col, nome_col, valor_col, 'faixa_atraso']].sort_values(by=venc_col), use_container_width=True, hide_index=True)
+
     else:
         st.error("Erro ao carregar os dados das planilhas.")
 
