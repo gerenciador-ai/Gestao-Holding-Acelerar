@@ -401,15 +401,21 @@ else:
             # 2. Clientes Fechados: Contagem total de novos contratos ativados no mês
             cl_fech = len(df_f[df_f['mrr'] > 0])
             
-            # 3. MRR Perdido (Churn do Mês): 
-            # Filtra na base geral quem cancelou EXATAMENTE no mês/ano selecionado (independente de quando foi vendido)
+                      # 3. MRR Perdido (Churn do Mês): 
+            # REGRA DE NEGÓCIO: Filtra apenas cancelamentos do produto principal "Sittax Simples"
+            # Isso garante que upgrades/serviços extras não inflem a contagem de clientes cancelados.
             df_churn_mes = df_p[
                 (df_p['data_cancelamento'].dt.year == ano_sel) & 
-                (df_p['data_cancelamento'].dt.month.isin([meses_pt_inv[m] for m in meses_sel]))
+                (df_p['data_cancelamento'].dt.month.isin([meses_pt_inv[m] for m in meses_sel])) &
+                (df_p['produto'].str.contains('Sittax Simples', case=False, na=False))
             ]
+            
+            # Soma o MRR de todas as linhas canceladas no mês (incluindo upgrades vinculados ao cancelamento)
+            # Se preferir que o MRR Perdido considere APENAS o produto principal, mantenha como está.
+            # Se quiser somar TUDO que o cliente pagava, me avise para um pequeno ajuste.
             mrr_perd = df_churn_mes['mrr'].sum()
             
-            # 4. Clientes Cancelados: Contagem de perdas no mês selecionado
+            # 4. Clientes Cancelados: Contagem de perdas (Unidades de Sittax Simples) no mês selecionado
             cl_canc = len(df_churn_mes)
             
             # 5. MRR Ativo (Net): Saldo líquido do período (Conquistado - Perdido)
