@@ -474,6 +474,9 @@ else:
                 st.plotly_chart(fig, use_container_width=True)
             with col3:
                 # --- CORREÇÃO: EVOLUÇÃO DE CHURN (HISTÓRICO REAL POR DATA DE CANCELAMENTO) ---
+                # Define o dicionário de meses localmente para evitar o erro NameError
+                meses_pt = {1:'Janeiro', 2:'Fevereiro', 3:'Março', 4:'Abril', 5:'Maio', 6:'Junho', 7:'Julho', 8:'Agosto', 9:'Setembro', 10:'Outubro', 11:'Novembro', 12:'Dezembro'}
+                
                 # Filtra na base completa (df_p) quem cancelou no ano selecionado e é o produto principal
                 df_c_evol_base = df_p[
                     (df_p['data_cancelamento'].dt.year == ano_sel) & 
@@ -483,6 +486,8 @@ else:
                 # Agrupa pelo mês da DATA DE CANCELAMENTO (não da venda)
                 df_c_evol = df_c_evol_base.groupby(df_c_evol_base['data_cancelamento'].dt.month).agg({'mrr':'sum', 'cliente':'count'}).reset_index()
                 df_c_evol.columns = ['mes_num', 'mrr', 'cliente']
+                
+                # Converte número do mês para nome e ordena
                 df_c_evol['mes_nome'] = df_c_evol['mes_num'].map(meses_pt)
                 df_c_evol = df_c_evol.sort_values('mes_num')
                 
