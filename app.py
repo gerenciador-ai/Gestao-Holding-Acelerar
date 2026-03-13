@@ -205,24 +205,25 @@ EMPRESAS = {
 USUARIOS_SHEET_ID = '15FsHefIdRzwUGm6FcpQQF-qiOtPwYHd-v70MwErOAMk'
 SENHA_MESTRA = 'Acelerar@2026'
 
-# Funções de Carregamento de Dados
-@st.cache_data(ttl=600)
+# Funções de Carregamento de Dados com Cache Otimizado
+@st.cache_data(ttl=600, show_spinner="Carregando dados das planilhas...")
 def load_data(sheet_id, gid=None):
     if gid and gid != '0':
         url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv&gid={gid}"
     else:
         url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv"
     try:
-        df = pd.read_csv(url)
+        df = pd.read_csv(url, on_bad_lines='skip', low_memory=False)
         df.columns = df.columns.str.strip()
         return df
-    except:
+    except Exception as e:
+        st.error(f"Erro ao conectar com o Google Sheets: {str(e)}")
         return pd.DataFrame()
 
 def load_usuarios():
     url = f"https://docs.google.com/spreadsheets/d/{USUARIOS_SHEET_ID}/export?format=csv"
     try:
-        df = pd.read_csv(url)
+        df = pd.read_csv(url, on_bad_lines='skip')
         df.columns = df.columns.str.strip()
         return df
     except:
@@ -269,6 +270,7 @@ def processar_dados(empresa):
     df_v = load_data(config['vendas_id'], config['vendas_gid'])
     df_c = load_data(config['cancelados_id'], config['cancelados_gid'])
     df_cr = load_data(config['contas_receber_id'])
+    
     if df_v.empty: return None, None, None
     
     # Processamento de Vendas
