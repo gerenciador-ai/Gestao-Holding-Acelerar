@@ -473,12 +473,24 @@ else:
                 fig.update_layout(xaxis_title=None, yaxis_title=None, plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)')
                 st.plotly_chart(fig, use_container_width=True)
             with col3:
-                df_c_evol = df_ano[df_ano['status'] == 'Cancelada'].groupby(['mes_num','mes_nome']).agg({'mrr':'sum', 'cliente':'count'}).reset_index().sort_values('mes_num')
-                df_c_evol = df_c_evol[df_c_evol['mrr'] > 0]
+                # --- CORREÇÃO: EVOLUÇÃO DE CHURN (HISTÓRICO REAL POR DATA DE CANCELAMENTO) ---
+                # Filtra na base completa (df_p) quem cancelou no ano selecionado e é o produto principal
+                df_c_evol_base = df_p[
+                    (df_p['data_cancelamento'].dt.year == ano_sel) & 
+                    (df_p['produto'].str.contains('Sittax Simples', case=False, na=False))
+                ]
+                
+                # Agrupa pelo mês da DATA DE CANCELAMENTO (não da venda)
+                df_c_evol = df_c_evol_base.groupby(df_c_evol_base['data_cancelamento'].dt.month).agg({'mrr':'sum', 'cliente':'count'}).reset_index()
+                df_c_evol.columns = ['mes_num', 'mrr', 'cliente']
+                df_c_evol['mes_nome'] = df_c_evol['mes_num'].map(meses_pt)
+                df_c_evol = df_c_evol.sort_values('mes_num')
+                
                 fig = px.bar(df_c_evol, x='mes_nome', y='mrr', text='cliente', title="Evolução de Churn", color_discrete_sequence=[COLOR_PRIMARY])
                 fig.update_traces(texttemplate='%{text}', textposition='inside')
                 fig.update_layout(xaxis_title=None, yaxis_title=None, plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)')
                 st.plotly_chart(fig, use_container_width=True)
+                # ----------------------------------------------------------------------------
 
             st.divider()
             
