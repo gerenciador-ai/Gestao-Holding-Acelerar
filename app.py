@@ -6,7 +6,7 @@ from datetime import datetime
 import base64
 import os
 
-# 1. MENU FIXO: Configuração da página com Sidebar sempre expandida
+# 1. CONFIGURAÇÃO DA PÁGINA: Sidebar sempre expandida
 st.set_page_config(
     layout="wide", 
     page_title="Dashboard Comercial Estratégico - Acelerar.tech", 
@@ -35,25 +35,27 @@ LOGOS = {
     "VICTEC": get_github_url("logo_victec.png")
 }
 
-# 2. MENU FIXO E COMPACTO: Estilização CSS para travar a sidebar e reduzir fontes
+# 2. MENU FIXO E VISÍVEL: CSS para manter a sidebar aberta e remover botões gerenciais
 st.markdown(f"""
     <style>
     /* Fundo Principal */
     .main {{ background-color: {COLOR_BG}; }}
     
-    /* MENU FIXO: Trava a sidebar para não recolher e ajusta largura mínima */
+    /* SIDEBAR FIXA E VISÍVEL: Garante que a barra lateral não suma e fique travada */
     [data-testid="stSidebar"] {{
         background-color: {COLOR_PRIMARY} !important;
-        min-width: 250px !important;
-        max-width: 250px !important;
+        min-width: 260px !important;
+        max-width: 260px !important;
+        visibility: visible !important;
+        display: block !important;
     }}
     
-    /* Esconde o botão de recolhimento da sidebar */
+    /* Esconde o botão de recolhimento da sidebar para deixá-la fixa */
     button[data-testid="sidebar-collapse-button"] {{
         display: none !important;
     }}
     
-    /* Fontes menores na Sidebar para ocupar menos espaço */
+    /* Fontes menores na Sidebar para visual compacto */
     [data-testid="stSidebar"] .stMarkdown p, 
     [data-testid="stSidebar"] label {{
         font-size: 0.85rem !important;
@@ -74,11 +76,16 @@ st.markdown(f"""
         color: {COLOR_TEXT} !important;
     }}
     
-    /* WHITE LABEL - CAMUFLAGEM VISUAL */
-    header[data-testid="stHeader"] {{ background: transparent !important; display: none !important; }}
+    /* WHITE LABEL - CAMUFLAGEM DE MENUS (GITHUB, SHARE, ETC) */
+    header[data-testid="stHeader"] {{ background: transparent !important; }}
     footer {{ display: none !important; }}
     [data-testid="stDecoration"] {{ display: none !important; }}
     [data-testid="stToolbar"] {{ display: none !important; }}
+    
+    /* Esconder botões gerenciais no topo sem sumir com a sidebar */
+    button[title="View source on GitHub"], 
+    button[title="Share this app"], 
+    #MainMenu {{ display: none !important; }}
     
     /* Login Styles - REPOSICIONADO NO TOPO */
     .login-container {{
@@ -210,7 +217,7 @@ if not st.session_state.usuario_logado:
 else:
     df_p, df_cr, df_c = processar_dados(st.session_state.empresa)
     
-    # 4. SIDEBAR INTELIGENTE: Filtros dinâmicos por aba
+    # 4. SIDEBAR INTELIGENTE E FIXA: Filtros dinâmicos por aba
     with st.sidebar:
         st.image(LOGOS["ACELERAR_SIDEBAR"], width=140)
         st.markdown(f"👤 **{st.session_state.email_usuario}**")
@@ -310,8 +317,9 @@ else:
                 else: return '>90 dias'
             df_cr['faixa'] = df_cr['dias'].apply(cat_aging)
             
-            # 5. REGRA PIOR FAIXA: Cliente aparece apenas uma vez
+            # 5. REGRA PIOR FAIXA CORRIGIDA: Cliente aparece APENAS na sua faixa de maior atraso
             nome_col = next(c for c in df_cr.columns if 'nome' in c.lower() or 'cliente' in c.lower())
+            # Identifica a maior faixa de atraso para cada cliente
             df_pior = df_cr.sort_values('dias', ascending=False).drop_duplicates(subset=[nome_col])
             
             c_i1, c_i2 = st.columns(2)
@@ -319,6 +327,13 @@ else:
             c_i2.metric("Qtd Clientes", len(df_pior))
             
             st.divider()
+            # O gráfico de rosca agora usa o df_pior, garantindo contagem única por cliente na sua pior faixa
             aging_q = df_pior.groupby('faixa').size().reset_index(name='qtd')
-            fig_aging = px.pie(aging_q, values='qtd', names='faixa', hole=0.4, title="Distribuição por Pior Faixa (Qtd Clientes)", color_discrete_sequence=[COLOR_PRIMARY, COLOR_SECONDARY, '#FF6B6B', '#E74C3C'])
+            # Garante a ordem correta das faixas no gráfico
+            ordem_f = ['0-30 dias', '31-60 dias', '61-90 dias', '>90 dias']
+            aging_q['faixa'] = pd.Categorical(aging_q['faixa'], categories=ordem_f, ordered=True)
+            aging_q = aging_q.sort_values('faixa')
+            
+            fig_aging = px.pie(aging_q, values='qtd', names='faixa', hole=0.4, title="Distribuição por Pior Faixa (Qtd Clientes Únicos)", color_discrete_sequence=[COLOR_PRIMARY, COLOR_SECONDARY, '#FF6B6B', '#E74C3C'])
+            fig_aging.update_layout(legend_title_text='Faixa de Atraso')
             st.plotly_chart(fig_aging, use_container_width=True)
