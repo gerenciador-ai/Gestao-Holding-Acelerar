@@ -20,19 +20,19 @@ COLOR_TEXT = "#FFFFFF"
 COLOR_BG = "#0A1E2E"
 
 # CONFIGURAÇÕES DE ACESSO (LITERAL DO COMERCIAL.PY)
-USUARIOS_SHEET_ID = '15FsHefIdRzwUGm6FcpQQF-qiOtPwYHd-v70MwErOAMk'
-SENHA_MESTRA = 'Acelerar@2026'
+USUARIOS_SHEET_ID = "15FsHefIdRzwUGm6FcpQQF-qiOtPwYHd-v70MwErOAMk"
+SENHA_MESTRA = "Acelerar@2026"
 
 # ESTADOS DE SESSÃO
-if 'usuario_logado' not in st.session_state: st.session_state.usuario_logado = False
-if 'email_usuario' not in st.session_state: st.session_state.email_usuario = None
-if 'modulo' not in st.session_state: st.session_state.modulo = 'hub'
+if "usuario_logado" not in st.session_state: st.session_state.usuario_logado = False
+if "email_usuario" not in st.session_state: st.session_state.email_usuario = None
+if "modulo" not in st.session_state: st.session_state.modulo = "hub"
 
 # --- 2. FUNÇÃO DE CARREGAMENTO DE USUÁRIOS ---
 @st.cache_data(ttl=600)
 def carregar_usuarios_autorizados():
     try:
-        url = f"https://docs.google.com/spreadsheets/d/{USUARIOS_SHEET_ID}/export?format=csv"
+        url = "https://docs.google.com/spreadsheets/d/" + USUARIOS_SHEET_ID + "/export?format=csv"
         response = requests.get(url )
         if response.status_code == 200:
             df = pd.read_csv(StringIO(response.text))
@@ -42,8 +42,7 @@ def carregar_usuarios_autorizados():
         return []
 
 # --- 3. CSS DO LOGIN (LIMPEZA TOTAL) ---
-# Usando aspas triplas puras para evitar erros de escape
-st.markdown("""
+css_style = """
 <style>
     .stApp { background-color: #0A1E2E; }
     [data-testid="stSidebar"] { display: none !important; }
@@ -64,7 +63,8 @@ st.markdown("""
         border: 1px solid #89CFF0;
     }
 </style>
-""", unsafe_allow_html=True)
+"""
+st.markdown(css_style, unsafe_allow_html=True)
 
 # --- 4. TELA DE LOGIN ---
 def tela_login():
@@ -83,17 +83,18 @@ def tela_login():
             usuarios_permitidos = carregar_usuarios_autorizados()
             email_input = email.strip().lower()
             
-            if (email_input in usuarios_permitidos or email_input == 'acelerar@acelerar.tech') and senha == SENHA_MESTRA:
+            if (email_input in usuarios_permitidos or email_input == "acelerar@acelerar.tech") and senha == SENHA_MESTRA:
                 st.session_state.usuario_logado = True
                 st.session_state.email_usuario = email_input
                 st.rerun()
             else:
-                st.error("❌ Acesso negado. Verifique seu e-mail ou a senha mestra.")
+                st.error("Acesso negado. Verifique seu e-mail ou a senha mestra.")
         st.markdown("</div>", unsafe_allow_html=True)
 
 # --- 5. PORTAL DE SELEÇÃO DE MÓDULOS ---
 def portal_hub():
-    st.markdown(f"<h1 style='color: white; text-align: center;'>🚀 Bem-vindo, {st.session_state.email_usuario.split('@')[0].upper()}!</h1>", unsafe_allow_html=True)
+    nome_usuario = st.session_state.email_usuario.split("@")[0].upper()
+    st.markdown("<h1 style='color: white; text-align: center;'>🚀 Bem-vindo, " + nome_usuario + "!</h1>", unsafe_allow_html=True)
     st.markdown("<h4 style='color: #89CFF0; text-align: center;'>Escolha o módulo da Holding Acelerar para iniciar:</h4>", unsafe_allow_html=True)
     st.divider()
     
@@ -102,14 +103,14 @@ def portal_hub():
         st.info("### 📊 Módulo Comercial")
         st.write("Gestão estratégica de Vendas, Churn e Inadimplência.")
         if st.button("Acessar Comercial", use_container_width=True, type="primary"):
-            st.session_state.modulo = 'comercial'
+            st.session_state.modulo = "comercial"
             st.rerun()
             
     with col2:
         st.success("### 💰 Módulo Financeiro")
         st.write("DRE, DFC e Integração Financeira via Nibo (Bllog).")
         if st.button("Acessar Financeiro", use_container_width=True, type="primary"):
-            st.session_state.modulo = 'financeiro'
+            st.session_state.modulo = "financeiro"
             st.rerun()
     
     st.divider()
@@ -123,20 +124,20 @@ def portal_hub():
 if not st.session_state.usuario_logado:
     tela_login()
 else:
-    if st.session_state.modulo == 'hub':
+    if st.session_state.modulo == "hub":
         portal_hub()
-    elif st.session_state.modulo == 'comercial':
+    elif st.session_state.modulo == "comercial":
         try:
             with open("comercial/comercial.py", encoding="utf-8") as f:
                 exec(f.read())
         except Exception as e:
-            st.error(f"Erro ao carregar o módulo Comercial: {e}")
+            st.error("Erro ao carregar o módulo Comercial: " + str(e))
             if st.button("Voltar ao Hub"):
-                st.session_state.modulo = 'hub'
+                st.session_state.modulo = "hub"
                 st.rerun()
-    elif st.session_state.modulo == 'financeiro':
+    elif st.session_state.modulo == "financeiro":
         st.info("### 💰 Módulo Financeiro em Desenvolvimento")
         st.write("Estamos conectando a API do Nibo e o motor de DRE para a Bllog.")
         if st.button("Voltar ao Hub", use_container_width=True):
-            st.session_state.modulo = 'hub'
+            st.session_state.modulo = "hub"
             st.rerun()
