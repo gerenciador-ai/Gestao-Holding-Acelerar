@@ -23,8 +23,9 @@ if "modulo" not in st.session_state:
 def carregar_usuarios():
     try:
         url_base = "https://docs.google.com/spreadsheets/d/"
-        url_final = "/export?format=csv"
-        url = url_base + ID_SHEET + url_final
+        url_mid = ID_SHEET
+        url_end = "/export?format=csv"
+        url = url_base + url_mid + url_end
         res = requests.get(url )
         if res.status_code == 200:
             df = pd.read_csv(StringIO(res.text))
@@ -34,26 +35,26 @@ def carregar_usuarios():
         return []
 
 # 5. INJEÇÃO DE CSS (FORMATO ULTRA SEGURO)
-# Dividido em partes para evitar quebras de string do interpretador
-css_1 = "<style>.stApp { background-color: #0A1E2E; } "
-css_2 = "[data-testid='stSidebar'] { display: none !important; } "
-css_3 = "[data-testid='collapsedControl'] { display: none !important; } "
-css_4 = ".login-box { background-color: #0B2A4E; padding: 40px; border-radius: 15px; "
-css_5 = "border: 1px solid #89CFF0; box-shadow: 0 10px 25px rgba(0,0,0,0.5); "
-css_6 = "max-width: 450px; margin: 5% auto; text-align: center; }</style>"
-st.markdown(css_1 + css_2 + css_3 + css_4 + css_5 + css_6, unsafe_allow_html=True)
+# Strings curtas e concatenadas para evitar erros de interpretador
+s1 = "<style>.stApp { background-color: #0A1E2E; } "
+s2 = "[data-testid='stSidebar'] { display: none !important; } "
+s3 = "[data-testid='collapsedControl'] { display: none !important; } "
+s4 = ".login-box { background-color: #0B2A4E; padding: 40px; border-radius: 15px; "
+s5 = "border: 1px solid #89CFF0; box-shadow: 0 10px 25px rgba(0,0,0,0.5); "
+s6 = "max-width: 450px; margin: 5% auto; text-align: center; }</style>"
+st.write(s1 + s2 + s3 + s4 + s5 + s6, unsafe_allow_html=True)
 
 # 6. TELA DE LOGIN
 def tela_login():
     c1, c2, c3 = st.columns([1, 2, 1])
     with c2:
-        st.markdown("<div class='login-box'>", unsafe_allow_html=True)
+        st.write("<div class='login-box'>", unsafe_allow_html=True)
         img_url = "https://raw.githubusercontent.com/gerenciador-ai/Relat-rios-Comercial/main/logo_acelerar_sidebar.png"
         st.image(img_url, width=250 )
-        st.markdown("<h2 style='color: white; margin-top: 20px;'>Portal da Holding</h2>", unsafe_allow_html=True)
+        st.write("<h2 style='color: white; margin-top: 20px;'>Portal da Holding</h2>", unsafe_allow_html=True)
         email = st.text_input("E-mail corporativo", placeholder="seuemail@acelerar.tech")
         senha = st.text_input("Senha mestra", type="password")
-        st.markdown("  
+        st.write("  
 ", unsafe_allow_html=True)
         if st.button("Acessar Portal", use_container_width=True):
             users = carregar_usuarios()
@@ -64,13 +65,13 @@ def tela_login():
                 st.rerun()
             else:
                 st.error("❌ Acesso negado.")
-        st.markdown("</div>", unsafe_allow_html=True)
+        st.write("</div>", unsafe_allow_html=True)
 
 # 7. PORTAL HUB
 def portal_hub():
     user_name = st.session_state.email_usuario.split("@")[0].upper()
-    st.markdown("<h1 style='color: white; text-align: center;'>🚀 Bem-vindo, " + user_name + "!</h1>", unsafe_allow_html=True)
-    st.markdown("<h4 style='color: #89CFF0; text-align: center;'>Escolha o módulo para iniciar:</h4>", unsafe_allow_html=True)
+    st.write("<h1 style='color: white; text-align: center;'>🚀 Bem-vindo, " + user_name + "!</h1>", unsafe_allow_html=True)
+    st.write("<h4 style='color: #89CFF0; text-align: center;'>Escolha o módulo para iniciar:</h4>", unsafe_allow_html=True)
     st.divider()
     col1, col2 = st.columns(2)
     with col1:
