@@ -13,26 +13,17 @@ SENHA_MESTRA = 'Acelerar@2026'
 
 # 3. FUNÇÃO DE CARREGAMENTO DE USUÁRIOS (EXATA DO COMERCIAL.PY)
 @st.cache_data(ttl=600)
-def load_data(sheet_id, gid=None):
-    if gid and gid != '0':
-        url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv&gid={gid}"
-    else:
-        url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv"
+def carregar_usuarios_autorizados():
     try:
-        df = pd.read_csv(url)
-        df.columns = df.columns.str.strip()
-        return df
+        url = f"https://docs.google.com/spreadsheets/d/{USUARIOS_SHEET_ID}/export?format=csv"
+        response = requests.get(url )
+        if response.status_code == 200:
+            df = pd.read_csv(StringIO(response.text))
+            # Pega a primeira coluna (E-mail) e limpa espaços/letras
+            return df.iloc[:, 0].astype(str).str.strip().str.lower().tolist()
+        return []
     except:
-        return pd.DataFrame()
-
-def load_usuarios():
-    url = f"https://docs.google.com/spreadsheets/d/{USUARIOS_SHEET_ID}/export?format=csv"
-    try:
-        df = pd.read_csv(url)
-        df.columns = df.columns.str.strip()
-        return df
-    except:
-        return pd.DataFrame()
+        return []
 
 # 4. INICIALIZAÇÃO DO ESTADO DA SESSÃO
 if 'usuario_logado' not in st.session_state:
