@@ -43,7 +43,7 @@ def carregar_usuarios_autorizados():
 
 # --- 3. CSS DO LOGIN (LIMPEZA TOTAL E ESTILO SÊNIOR PREMIUM) ---
 st.markdown(f"""
-    <style>
+<style>
     .stApp {{ background-color: {COLOR_BG}; }}
     [data-testid="stSidebar"] {{ display: none !important; }}
     [data-testid="collapsedControl"] {{ display: none !important; }}
@@ -62,7 +62,7 @@ st.markdown(f"""
         color: white;
         border: 1px solid {COLOR_SECONDARY};
     }}
-    </style>
+</style>
 """, unsafe_allow_html=True)
 
 # --- 4. TELA DE LOGIN ---
@@ -93,7 +93,7 @@ def tela_login():
 # --- 5. PORTAL DE SELEÇÃO DE MÓDULOS ---
 def portal_hub():
     st.markdown(f"<h1 style='color: {COLOR_TEXT}; text-align: center;'>🚀 Bem-vindo, {st.session_state.email_usuario.split('@')[0].upper()}!</h1>", unsafe_allow_html=True)
-    st.markdown("<h4 style='color: #89CFF0; text-align: center;'>Escolha o módulo da Holding Acelerar para iniciar:</h4>", unsafe_allow_html=True)
+    st.markdown(f"<h4 style='color: {COLOR_SECONDARY}; text-align: center;'>Escolha o módulo da Holding Acelerar para iniciar:</h4>", unsafe_allow_html=True)
     st.divider()
     
     col1, col2 = st.columns(2)
