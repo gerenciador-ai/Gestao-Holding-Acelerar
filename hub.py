@@ -92,9 +92,14 @@ else:
     if st.session_state.modulo == 'hub':
         portal_hub()
     elif st.session_state.modulo == 'comercial':
-        # Aqui chamaremos o comercial.py (Ajustaremos isso no próximo passo)
-        st.write("Redirecionando para Comercial...")
-        # Importante: Como o Streamlit não permite rodar arquivos .py dentro de outros facilmente,
-        # usaremos a lógica de 'Multipage' ou 'Import' para o comercial.py
+        # Executa o arquivo comercial.py sem precisar alterar nada nele
+        try:
+            with open("comercial/comercial.py", encoding="utf-8") as f:
+                exec(f.read())
+        except FileNotFoundError:
+            st.error("Arquivo comercial/comercial.py não encontrado.")
     elif st.session_state.modulo == 'financeiro':
-        st.write("Redirecionando para Financeiro...")
+        st.info("Módulo Financeiro em desenvolvimento (Piloto Bllog).")
+        if st.button("Voltar ao Hub"):
+            st.session_state.modulo = 'hub'
+            st.rerun()
